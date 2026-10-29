@@ -2,11 +2,21 @@ package com.example.camera
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Color as AndroidColor
+import android.graphics.Typeface
+import android.graphics.PorterDuff
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.content.ContentValues
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.camera.core.Camera
+import androidx.camera.core.CameraEffect
+import androidx.camera.core.UseCaseGroup
+import androidx.camera.effects.OverlayEffect
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExposureState
 import androidx.camera.core.Preview
@@ -24,6 +34,7 @@ import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import com.example.data.model.VideoResolution
+import com.example.data.model.GpsTelemetry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +48,11 @@ class CameraRecordingManager(private val context: Context) {
     private var cameraProvider: ProcessCameraProvider? = null
     private var activeCamera: Camera? = null
     private var videoCapture: VideoCapture<Recorder>? = null
+    private var liveHudEffect: OverlayEffect? = null
+
+    /** Supplies the latest GPS values to the encoder-side HUD for every video frame. */
+    var telemetryProvider: (() -> GpsTelemetry)? = null
+    var speedUnitLabelProvider: (() -> String)? = null
     private var activeRecording: Recording? = null
 
     private var currentLensFacing = CameraSelector.LENS_FACING_BACK
@@ -119,11 +135,46 @@ class CameraRecordingManager(private val context: Context) {
 
             videoCapture = VideoCapture.withOutput(recorder)
 
+            // OverlayEffect runs inside CameraX's video pipeline, so these pixels are encoded
+            // into the MP4 itself instead of being added to the Compose preview only.
+            liveHudEffect?.close()
+            val hudEffect = OverlayEffect(
+                CameraEffect.VIDEO_CAPTURE,
+                0,
+                Handler(Looper.getMainLooper())
+            ) { throwable ->
+                Log.e("CameraRecordingManager", "Live HUD effect failed", throwable)
+            }
+            hudEffect.setOnDrawListener { frame ->
+                val canvas = frame.overlayCanvas
+                canvas.drawColor(AndroidColor.TRANSPARENT, PorterDuff.Mode.CLEAR)
+                val telemetry = telemetryProvider?.invoke()
+                if (telemetry != null) {
+                    drawLiveHud(
+                        canvas = canvas,
+                        speed = telemetry.speedKmh,
+                        unit = speedUnitLabelProvider?.invoke() ?: "km/h",
+                        gpsFixed = telemetry.isGpsFixed,
+                        maxSpeed = telemetry.maxSpeedKmh,
+                        distanceKm = telemetry.distanceKm
+                    )
+                } else {
+                    drawLiveHud(canvas, 0f, "km/h", false, 0f, 0f)
+                }
+                true
+            }
+            liveHudEffect = hudEffect
+
+            val useCaseGroup = UseCaseGroup.Builder()
+                .addUseCase(preview)
+                .addUseCase(videoCapture!!)
+                .addEffect(hudEffect)
+                .build()
+
             activeCamera = provider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
-                preview,
-                videoCapture
+                useCaseGroup
             )
 
             applyNightModeSettings()
@@ -132,6 +183,76 @@ class CameraRecordingManager(private val context: Context) {
             Log.e("CameraRecordingManager", "Error binding camera lifecycle", e)
             onRecordingError?.invoke("Gagal mengaktifkan kamera: ${e.localizedMessage}")
         }
+    }
+
+    private fun drawLiveHud(
+        canvas: Canvas,
+        speed: Float,
+        unit: String,
+        gpsFixed: Boolean,
+        maxSpeed: Float,
+        distanceKm: Float
+    ) {
+        val w = canvas.width.toFloat()
+        val h = canvas.height.toFloat()
+        if (w <= 0f || h <= 0f) return
+
+        val scale = (w / 1080f).coerceIn(0.65f, 2.5f)
+        val margin = 28f * scale
+        val panelW = 300f * scale
+        val panelH = 126f * scale
+        val left = w - panelW - margin
+        val top = h - panelH - margin
+        val radius = 18f * scale
+
+        val panel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = AndroidColor.argb(205, 7, 13, 20)
+            style = Paint.Style.FILL
+        }
+        canvas.drawRoundRect(left, top, left + panelW, top + panelH, radius, radius, panel)
+
+        val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = AndroidColor.rgb(0, 229, 255)
+            style = Paint.Style.STROKE
+            strokeWidth = 2f * scale
+        }
+        canvas.drawRoundRect(left, top, left + panelW, top + panelH, radius, radius, border)
+
+        val gpsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (gpsFixed) AndroidColor.rgb(0, 230, 118) else AndroidColor.rgb(255, 55, 75)
+            style = Paint.Style.FILL
+        }
+        val gpsX = left + 22f * scale
+        val gpsY = top + 23f * scale
+        canvas.drawCircle(gpsX, gpsY, 6f * scale, gpsPaint)
+
+        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = AndroidColor.rgb(190, 208, 220)
+            textSize = 15f * scale
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        canvas.drawText(if (gpsFixed) "GPS LOCK" else "GPS NO SIGNAL", left + 36f * scale, top + 28f * scale, labelPaint)
+
+        val speedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = AndroidColor.WHITE
+            textSize = 46f * scale
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        }
+        canvas.drawText(speed.coerceAtLeast(0f).toInt().toString(), left + 18f * scale, top + 78f * scale, speedPaint)
+
+        val unitPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = AndroidColor.rgb(0, 229, 255)
+            textSize = 17f * scale
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        canvas.drawText(unit, left + 100f * scale, top + 77f * scale, unitPaint)
+
+        val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = AndroidColor.rgb(210, 221, 230)
+            textSize = 12f * scale
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        }
+        canvas.drawText("MAX ${maxSpeed.toInt()}   DIST ${String.format(Locale.US, "%.1f", distanceKm)} km", left + 18f * scale, top + 106f * scale, detailPaint)
     }
 
     fun switchCamera(lifecycleOwner: LifecycleOwner, previewView: PreviewView, resolution: VideoResolution) {
@@ -265,5 +386,7 @@ class CameraRecordingManager(private val context: Context) {
     fun release() {
         stopRecording()
         cameraProvider?.unbindAll()
+        liveHudEffect?.close()
+        liveHudEffect = null
     }
 }
