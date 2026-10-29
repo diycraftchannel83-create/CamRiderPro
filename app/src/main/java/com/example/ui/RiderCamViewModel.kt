@@ -188,8 +188,33 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
                 fileSizeFormatted = displayPath
             )
 
-            rideDao.insertRide(RideEntity.fromRideSession(session))
-            _bannerMessage.value = "Tersimpan di 0://Movies/RiderCam/"
+            val rideId = rideDao.insertRide(RideEntity.fromRideSession(session))
+            val savedSession = session.copy(id = rideId)
+            _bannerMessage.value = "Rekaman tersimpan. Sedang menanamkan HUD speedometer ke video..."
+
+            // CameraX records only the camera stream; the Compose speedometer is a preview-only layer.
+            // Automatically render the HUD into a new MP4 after the recording is finalized.
+            try {
+                videoExporter.resetState()
+                videoExporter.exportVideoWithSpeedometerOverlay(
+                    savedSession,
+                    _settings.value.speedUnit
+                )
+                when (val result = videoExporter.exportState.value) {
+                    is com.example.export.ExportState.Success -> {
+                        rideDao.updateRideVideoPath(rideId, result.outputUri.toString())
+                        _bannerMessage.value = "Selesai: video dengan HUD speedometer tersimpan di Movies/RiderCam"
+                    }
+                    is com.example.export.ExportState.Error -> {
+                        _bannerMessage.value = "Video asli tersimpan, tetapi HUD gagal ditanamkan: ${result.errorMessage}"
+                    }
+                    else -> {
+                        _bannerMessage.value = "Video asli tersimpan. HUD belum selesai diproses; coba ekspor HUD dari riwayat."
+                    }
+                }
+            } catch (e: Exception) {
+                _bannerMessage.value = "Video asli tersimpan, tetapi ekspor HUD gagal: ${e.localizedMessage ?: "kesalahan tidak diketahui"}"
+            }
         }
     }
 
