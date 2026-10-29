@@ -3,6 +3,7 @@ package com.example.export
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -169,6 +170,17 @@ class TelemetryVideoExporter(private val context: Context) {
     ): Bitmap {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
+
+        // Draw the supplied artwork used by the live app HUD as the video base layer.
+        // The telemetry summary is rendered above this artwork below.
+        BitmapFactory.decodeResource(context.resources, com.example.R.drawable.camrider_flyer_overlay)?.let { artwork ->
+            val destination = RectF(0f, 0f, width.toFloat(), height.toFloat())
+            val artworkPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+                alpha = 224
+            }
+            canvas.drawBitmap(artwork, null, destination, artworkPaint)
+            artwork.recycle()
+        }
 
         // Use measured average speed instead of inventing a speed value from the maximum.
         // This is a summary HUD; per-frame live telemetry is not stored in the current ride model.
