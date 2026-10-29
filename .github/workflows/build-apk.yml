@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - camrider-hud-asset-layer
     paths:
       - '**.gradle'
       - '**.gradle.kts'
