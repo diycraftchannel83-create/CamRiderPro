@@ -18,6 +18,9 @@ interface RideDao {
     @Delete
     suspend fun deleteRide(ride: RideEntity)
 
+    @Query("UPDATE rides SET videoPath = :videoPath WHERE id = :id")
+    suspend fun updateRideVideoPath(id: Long, videoPath: String)
+
     @Query("SELECT * FROM rides WHERE id = :id LIMIT 1")
     suspend fun getRideById(id: Long): RideEntity?
 }
