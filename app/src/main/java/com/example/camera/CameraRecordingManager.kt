@@ -3,6 +3,9 @@ package com.example.camera
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.RectF
 import android.graphics.Paint
 import android.graphics.Color as AndroidColor
 import android.graphics.Typeface
@@ -49,6 +52,7 @@ class CameraRecordingManager(private val context: Context) {
     private var activeCamera: Camera? = null
     private var videoCapture: VideoCapture<Recorder>? = null
     private var liveHudEffect: OverlayEffect? = null
+    private var artworkBitmap: Bitmap? = null
 
     /** Supplies the latest GPS values to the encoder-side HUD for every video frame. */
     var telemetryProvider: (() -> GpsTelemetry)? = null
@@ -145,9 +149,26 @@ class CameraRecordingManager(private val context: Context) {
             ) { throwable ->
                 Log.e("CameraRecordingManager", "Live HUD effect failed", throwable)
             }
+            if (artworkBitmap == null) {
+                artworkBitmap = BitmapFactory.decodeResource(
+                    context.resources,
+                    com.example.R.drawable.camrider_flyer_overlay
+                )
+            }
             hudEffect.setOnDrawListener { frame ->
                 val canvas = frame.overlayCanvas
                 canvas.drawColor(AndroidColor.TRANSPARENT, PorterDuff.Mode.CLEAR)
+                artworkBitmap?.let { artwork ->
+                    val artworkPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+                        alpha = 224
+                    }
+                    canvas.drawBitmap(
+                        artwork,
+                        null,
+                        RectF(0f, 0f, canvas.width.toFloat(), canvas.height.toFloat()),
+                        artworkPaint
+                    )
+                }
                 val telemetry = telemetryProvider?.invoke()
                 if (telemetry != null) {
                     drawLiveHud(
