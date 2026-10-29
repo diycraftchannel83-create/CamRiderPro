@@ -10,6 +10,7 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.net.Uri
+import android.media.MediaScannerConnection
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
@@ -104,23 +105,17 @@ class TelemetryVideoExporter(private val context: Context) {
 
             val transformerListener = object : Transformer.Listener {
                 override fun onCompleted(composition: Composition, exportResult: ExportResult) {
-                    // Index into MediaStore so it appears in Gallery/Movies immediately
-                    val contentValues = ContentValues().apply {
-                        put(MediaStore.MediaColumns.DISPLAY_NAME, outputFileName)
-                        put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-                        put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/RiderCam")
+                    // The Transformer has already written outputFile. Scan that exact file instead
+                    // of inserting a new, empty MediaStore row (which made exports appear broken).
+                    MediaScannerConnection.scanFile(
+                        context,
+                        arrayOf(outputFile.absolutePath),
+                        arrayOf("video/mp4")
+                    ) { _, scannedUri ->
+                        val uri = scannedUri ?: Uri.fromFile(outputFile)
+                        _exportState.value = ExportState.Success(displayPath, uri)
+                        activeTransformer = null
                     }
-                    val uri = try {
-                        context.contentResolver.insert(
-                            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                            contentValues
-                        ) ?: Uri.fromFile(outputFile)
-                    } catch (_: Exception) {
-                        Uri.fromFile(outputFile)
-                    }
-
-                    _exportState.value = ExportState.Success(displayPath, uri)
-                    activeTransformer = null
                 }
 
                 override fun onError(
