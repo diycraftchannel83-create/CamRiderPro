@@ -170,7 +170,9 @@ class TelemetryVideoExporter(private val context: Context) {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
-        val speedVal = session.maxSpeedKmh * 0.75f // representative cruising speed for telemetry HUD
+        // Use measured average speed instead of inventing a speed value from the maximum.
+        // This is a summary HUD; per-frame live telemetry is not stored in the current ride model.
+        val speedVal = session.avgSpeedKmh
         val displaySpeed = (speedVal * speedUnit.multiplierFromKmh).toInt()
         val maxSpeedDisplay = (session.maxSpeedKmh * speedUnit.multiplierFromKmh).toInt()
 
