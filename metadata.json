@@ -1,0 +1,6 @@
+{
+  "name": "RiderCam",
+  "description": "Aplikasi dashcam & telemetry motor dengan speedometer GPS real-time, HUD overlay koordinat & rute, mode malam, dan perekaman otomatis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
