@@ -145,10 +145,10 @@ fun TelemetryOverlayHeader(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (settings.autoRecordOnMove) "AUTO-REC ON" else "STANDBY",
+                        text = "VIDEO RES",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (settings.autoRecordOnMove) NeonGreen else HudMuted
+                        color = NeonGreen
                     )
                 }
             }
