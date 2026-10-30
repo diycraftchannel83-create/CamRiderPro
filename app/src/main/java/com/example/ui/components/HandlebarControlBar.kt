@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
@@ -62,6 +63,7 @@ fun HandlebarControlBar(
     onLockScreen: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenHistory: () -> Unit,
+    onExitApp: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -141,6 +143,15 @@ fun HandlebarControlBar(
             contentDescription = "Settings",
             testTag = "btn_open_settings",
             onClick = onOpenSettings
+        )
+
+        // Exit application — kept below Settings and outside the recorded HUD.
+        HandlebarIconButton(
+            icon = Icons.Default.PowerSettingsNew,
+            contentDescription = "Power off / Exit app",
+            testTag = "btn_exit_app",
+            tint = NeonRed,
+            onClick = onExitApp
         )
     }
 }

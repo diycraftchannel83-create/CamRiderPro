@@ -1,6 +1,7 @@
 package com.example.ui.screens
 
 import android.Manifest
+import android.app.Activity
 import android.content.res.Configuration
 import android.view.Surface
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -37,6 +38,8 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -47,6 +50,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,8 +81,10 @@ import com.example.ui.theme.HudMuted
 import com.example.ui.theme.HudWhite
 import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonGreen
+import com.example.ui.theme.NeonRed
 import com.example.ui.theme.NeonYellow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun CameraRiderScreen(
@@ -104,6 +110,8 @@ fun CameraRiderScreen(
 
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
+    var showExitConfirmation by remember { mutableStateOf(false) }
+    val exitScope = rememberCoroutineScope()
     var previewViewRef by remember { mutableStateOf<PreviewView?>(null) }
 
     // Permissions check & request
@@ -310,6 +318,13 @@ fun CameraRiderScreen(
             onLockScreen = { viewModel.lockScreen() },
             onOpenSettings = { showSettingsDialog = true },
             onOpenHistory = { showHistoryDialog = true },
+            onExitApp = {
+                if (isRecording) {
+                    showExitConfirmation = true
+                } else {
+                    (context as? Activity)?.finishAffinity()
+                }
+            },
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 8.dp)
@@ -403,6 +418,35 @@ fun CameraRiderScreen(
                 onOverlayConfigChange = { viewModel.updateOverlayConfig(it) },
                 onToggleSimulation = { viewModel.toggleSimulation() },
                 onDismiss = { showSettingsDialog = false }
+            )
+        }
+
+        if (showExitConfirmation) {
+            AlertDialog(
+                onDismissRequest = { showExitConfirmation = false },
+                title = { Text("Keluar dari CamRiderPro?") },
+                text = { Text("Perekaman masih berjalan. Hentikan dan simpan rekaman sebelum keluar?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showExitConfirmation = false
+                        viewModel.toggleRecord()
+                        exitScope.launch {
+                            // Give CameraX time to finalize and save the MP4.
+                            delay(1800)
+                            (context as? Activity)?.finishAffinity()
+                        }
+                    }) {
+                        Text("HENTIKAN & KELUAR", color = NeonRed)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showExitConfirmation = false }) {
+                        Text("BATAL", color = HudWhite)
+                    }
+                },
+                containerColor = CockpitSurface,
+                titleContentColor = HudWhite,
+                textContentColor = HudMuted
             )
         }
 

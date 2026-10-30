@@ -58,7 +58,7 @@ class CameraRecordingManager(private val context: Context) {
     private var liveHudEffect: OverlayEffect? = null
 
     // CameraX OverlayEffect composes with OpenGL. Keep GL off the UI thread and
-    // rasterize the expensive HUD only 8 times/second instead of on every frame.
+    // refresh the HUD snapshot up to 15 times/second on a worker; CameraX composites it into every encoded frame.
     private val hudGlThread = HandlerThread("CamRider-OpenGL").apply { start() }
     private val hudGlHandler = Handler(hudGlThread.looper)
     private val hudRenderThread = HandlerThread("CamRider-HUD-Raster").apply { start() }
@@ -185,7 +185,7 @@ class CameraRecordingManager(private val context: Context) {
                 // the cached bitmap into CameraX's OpenGL overlay texture.
                 synchronized(hudBitmapLock) {
                     val sizeChanged = frameWidth != cachedHudWidth || frameHeight != cachedHudHeight
-                    val stale = now - cachedHudLastRenderMs >= 125L
+                    val stale = now - cachedHudLastRenderMs >= 66L
                     if ((sizeChanged || stale) && !hudRenderPending && frameWidth > 0 && frameHeight > 0) {
                         hudRenderPending = true
                         val crop = android.graphics.Rect(frame.cropRect)
@@ -194,9 +194,9 @@ class CameraRecordingManager(private val context: Context) {
                         // its ARGB_8888 memory footprint. Draw coordinates remain in frame
                         // space; Canvas scaling maps them into the smaller raster.
                         val bitmapScale = when {
-                            maxOf(frameWidth, frameHeight) >= 3000 -> 0.50f // 4K
-                            maxOf(frameWidth, frameHeight) >= 1800 -> 0.75f // 1080p
-                            else -> 1.00f // 720p and below
+                            maxOf(frameWidth, frameHeight) >= 3000 -> 0.60f // 4K: +20% from 0.50
+                            maxOf(frameWidth, frameHeight) >= 1800 -> 0.90f // 1080p: +20% from 0.75
+                            else -> 1.00f // 720p and below: already full resolution
                         }
                         val bitmapWidth = (frameWidth * bitmapScale).toInt().coerceAtLeast(1)
                         val bitmapHeight = (frameHeight * bitmapScale).toInt().coerceAtLeast(1)
