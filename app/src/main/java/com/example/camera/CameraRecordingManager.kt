@@ -273,11 +273,11 @@ class CameraRecordingManager(private val context: Context) {
 
         val recPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = red }
         canvas.drawCircle(margin + 15f * scale, top + 21f * scale, 6f * scale, recPaint)
-        canvas.drawText("AUTO REC", margin + 30f * scale, top + 27f * scale, paint(green, 15f, true))
-        canvas.drawText("1080p  60FPS  H.265", margin + 145f * scale, top + 26f * scale, paint(white, 11f))
+        canvas.drawText("VIDEO RES", margin + 30f * scale, top + 27f * scale, paint(green, 15f, true))
+        canvas.drawText("1080p  60FPS  H.265", margin + 158f * scale, top + 26f * scale, paint(white, 11f))
         val gpsColor = if (telemetry.isGpsFixed) green else red
         canvas.drawCircle(w - margin - 175f * scale, top + 21f * scale, 5f * scale, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = gpsColor })
-        canvas.drawText(if (telemetry.isGpsFixed) "GPS LOCK" else "GPS SEARCH", w - margin - 162f * scale, top + 26f * scale, paint(white, 11f))
+        canvas.drawText(if (telemetry.isGpsFixed) "GPS" else "GPS ...", w - margin - 162f * scale, top + 26f * scale, paint(white, 11f))
         val batteryIntent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
         val batteryLevel = batteryIntent?.getIntExtra("level", -1) ?: -1
         val batteryScale = batteryIntent?.getIntExtra("scale", 100) ?: 100
