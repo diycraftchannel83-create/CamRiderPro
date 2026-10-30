@@ -3,6 +3,7 @@ package com.example.camera
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Color as AndroidColor
@@ -205,18 +206,35 @@ class CameraRecordingManager(private val context: Context) {
         val rawHeight = canvas.height.toFloat()
         if (rawWidth <= 0f || rawHeight <= 0f) return
 
-        // Counter-rotate the HUD against CameraX sensor rotation so it stays upright
-        // after the MP4 rotation metadata is applied by video players.
+        // Build a logical HUD canvas in the final displayed orientation.
+        // CameraX stores landscape sensor buffers and applies MP4 rotation metadata;
+        // map the portrait HUD coordinates into that raw buffer with the matching
+        // inverse transform (including translation). Rotating around the center alone
+        // leaves the logical portrait origin outside the frame and clips the HUD.
         val normalizedRotation = ((rotationDegrees % 360) + 360) % 360
         val canvasSave = canvas.save()
-        when (normalizedRotation) {
-            90 -> canvas.rotate(-90f, rawWidth / 2f, rawHeight / 2f)
-            180 -> canvas.rotate(-180f, rawWidth / 2f, rawHeight / 2f)
-            270 -> canvas.rotate(-270f, rawWidth / 2f, rawHeight / 2f)
-        }
         val quarterTurn = normalizedRotation == 90 || normalizedRotation == 270
         val w = if (quarterTurn) rawHeight else rawWidth
         val h = if (quarterTurn) rawWidth else rawHeight
+        val transform = Matrix()
+        when (normalizedRotation) {
+            90 -> transform.setValues(floatArrayOf(
+                0f, -1f, rawWidth,
+                1f,  0f, 0f,
+                0f,  0f, 1f
+            ))
+            180 -> transform.setValues(floatArrayOf(
+                -1f, 0f, rawWidth,
+                 0f,-1f, rawHeight,
+                 0f, 0f, 1f
+            ))
+            270 -> transform.setValues(floatArrayOf(
+                0f, 1f, 0f,
+               -1f, 0f, rawHeight,
+                0f, 0f, 1f
+            ))
+        }
+        canvas.concat(transform)
 
         val scale = (w / 1080f).coerceIn(0.55f, 2.6f)
         val cyan = AndroidColor.rgb(69, 244, 255)
