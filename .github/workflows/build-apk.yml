@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - feature/futuristic-hud-dashboard
+      - feature/modular-3-layer-hud
     paths:
       - '**.gradle'
       - '**.gradle.kts'
