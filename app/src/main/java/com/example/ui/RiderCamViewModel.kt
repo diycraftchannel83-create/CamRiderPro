@@ -1,6 +1,7 @@
 package com.example.ui
 
 import android.app.Application
+import android.speech.tts.TextToSpeech
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.camera.CameraRecordingManager
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -55,8 +57,55 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
 
     val exportState: StateFlow<com.example.export.ExportState> = videoExporter.exportState
     private var recordingTelemetrySnapshot: GpsTelemetry? = null
+    private var voiceTts: TextToSpeech? = null
+    @Volatile private var ttsReady = false
+    private var wasRecording = false
+    private var speedAlertArmed = true
+    private var lastSpeedAlertAt = 0L
+
+    private fun speak(message: String) {
+        if (!ttsReady || !_settings.value.voiceAssistantEnabled) return
+        voiceTts?.speak(message, TextToSpeech.QUEUE_ADD, null, "camrider-${System.currentTimeMillis()}")
+    }
 
     init {
+        voiceTts = TextToSpeech(application) { status ->
+            ttsReady = status == TextToSpeech.SUCCESS
+            if (ttsReady) {
+                val result = voiceTts?.setLanguage(Locale.US)
+                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    voiceTts?.setLanguage(Locale.getDefault())
+                }
+                voiceTts?.setSpeechRate(0.95f)
+            }
+        }
+
+        telemetry.onEach { data ->
+            val prefs = _settings.value
+            val threshold = prefs.speedLimitKmh.toFloat()
+            if (!prefs.speedLimitAlertEnabled || !prefs.voiceAssistantEnabled) {
+                speedAlertArmed = true
+                return@onEach
+            }
+            if (data.speedKmh < threshold - 3f) speedAlertArmed = true
+            val now = System.currentTimeMillis()
+            if (speedAlertArmed && data.speedKmh >= threshold &&
+                now - lastSpeedAlertAt >= TimeUnit.SECONDS.toMillis(prefs.alertRepeatSeconds.toLong())) {
+                speedAlertArmed = false
+                lastSpeedAlertAt = now
+                val currentSpeed = (data.speedKmh * prefs.speedUnit.multiplierFromKmh).toInt()
+                val unitName = if (prefs.speedUnit == com.example.data.model.SpeedUnit.MPH) "miles per hour" else "kilometers per hour"
+                speak("Your current speed is $currentSpeed $unitName. Please slow down.")
+            }
+        }.launchIn(viewModelScope)
+
+        isRecording.onEach { recording ->
+            if (recording && !wasRecording && _settings.value.welcomeVoiceEnabled) {
+                speak("Welcome to CamRider Pro. Happy travelling and enjoy your journey!")
+            }
+            wasRecording = recording
+        }.launchIn(viewModelScope)
+
         // Observe saved rides from database
         rideDao.getAllRides().onEach { entities ->
             _rides.value = entities.map { it.toRideSession() }
@@ -129,6 +178,14 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
 
     fun updateSettings(newSettings: RecordingSettings) {
         _settings.value = newSettings
+        if (!newSettings.speedLimitAlertEnabled) speedAlertArmed = true
+    }
+
+    override fun onCleared() {
+        voiceTts?.stop()
+        voiceTts?.shutdown()
+        voiceTts = null
+        super.onCleared()
     }
 
     fun updateOverlayConfig(newConfig: OverlayConfig) {
