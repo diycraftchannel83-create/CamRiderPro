@@ -101,7 +101,6 @@ fun CameraRiderScreen(
     val rides by viewModel.rides.collectAsState()
     val bannerMessage by viewModel.bannerMessage.collectAsState()
     val isSimulating by viewModel.isSimulating.collectAsState()
-    val exportState by viewModel.exportState.collectAsState()
 
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
@@ -434,10 +433,7 @@ fun CameraRiderScreen(
         if (showHistoryDialog) {
             RideHistoryDialog(
                 rides = rides,
-                exportState = exportState,
                 onDeleteRide = { viewModel.deleteRide(it) },
-                onExportWithSpeedometer = { viewModel.exportVideoWithSpeedometer(it) },
-                onResetExportState = { viewModel.resetExportState() },
                 onDismiss = { showHistoryDialog = false }
             )
         }
