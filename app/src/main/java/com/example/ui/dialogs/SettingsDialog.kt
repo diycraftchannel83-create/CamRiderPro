@@ -257,6 +257,57 @@ fun SettingsDialog(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = "VOICE ASSISTANT",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NeonGreen
+                    )
+                    OverlayToggleItem("Voice Assistant", settings.voiceAssistantEnabled) {
+                        onSettingsChange(settings.copy(voiceAssistantEnabled = it))
+                    }
+                    OverlayToggleItem("Speed Limit Voice Alert", settings.speedLimitAlertEnabled) {
+                        onSettingsChange(settings.copy(speedLimitAlertEnabled = it))
+                    }
+                    OverlayToggleItem("Welcome Voice saat mulai REC", settings.welcomeVoiceEnabled) {
+                        onSettingsChange(settings.copy(welcomeVoiceEnabled = it))
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Batas Kecepatan", fontSize = 12.sp, color = HudWhite)
+                        Text("${settings.speedLimitKmh} km/h", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                    }
+                    Slider(
+                        value = settings.speedLimitKmh.toFloat(),
+                        onValueChange = { onSettingsChange(settings.copy(speedLimitKmh = it.toInt())) },
+                        valueRange = 30f..160f,
+                        steps = 25,
+                        enabled = settings.voiceAssistantEnabled && settings.speedLimitAlertEnabled,
+                        colors = SliderDefaults.colors(thumbColor = NeonGreen, activeTrackColor = NeonGreen)
+                    )
+                    Text(
+                        text = "Jeda pengulangan peringatan: ${settings.alertRepeatSeconds} detik",
+                        fontSize = 10.sp,
+                        color = HudMuted
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(15, 30, 60).forEach { seconds ->
+                            Box(
+                                modifier = Modifier
+                                    .background(if (settings.alertRepeatSeconds == seconds) NeonGreen else CockpitBlack, RoundedCornerShape(8.dp))
+                                    .border(1.dp, CockpitBorder, RoundedCornerShape(8.dp))
+                                    .clickable { onSettingsChange(settings.copy(alertRepeatSeconds = seconds)) }
+                                    .padding(horizontal = 12.dp, vertical = 7.dp)
+                            ) {
+                                Text("${seconds}s", fontSize = 11.sp, color = if (settings.alertRepeatSeconds == seconds) Color.Black else HudWhite)
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "Lokasi Penyimpanan Video:",
