@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Color as AndroidColor
 import android.graphics.Typeface
 import android.graphics.PorterDuff
@@ -150,16 +151,9 @@ class CameraRecordingManager(private val context: Context) {
                 canvas.drawColor(AndroidColor.TRANSPARENT, PorterDuff.Mode.CLEAR)
                 val telemetry = telemetryProvider?.invoke()
                 if (telemetry != null) {
-                    drawLiveHud(
-                        canvas = canvas,
-                        speed = telemetry.speedKmh,
-                        unit = speedUnitLabelProvider?.invoke() ?: "km/h",
-                        gpsFixed = telemetry.isGpsFixed,
-                        maxSpeed = telemetry.maxSpeedKmh,
-                        distanceKm = telemetry.distanceKm
-                    )
+                    drawLiveHud(canvas, telemetry, speedUnitLabelProvider?.invoke() ?: "km/h")
                 } else {
-                    drawLiveHud(canvas, 0f, "km/h", false, 0f, 0f)
+                    drawLiveHud(canvas, GpsTelemetry(), speedUnitLabelProvider?.invoke() ?: "km/h")
                 }
                 true
             }
@@ -185,74 +179,144 @@ class CameraRecordingManager(private val context: Context) {
         }
     }
 
-    private fun drawLiveHud(
-        canvas: Canvas,
-        speed: Float,
-        unit: String,
-        gpsFixed: Boolean,
-        maxSpeed: Float,
-        distanceKm: Float
-    ) {
+    /**
+     * Draws the same transparent cyan/neon HUD used by the camera screen directly onto
+     * CameraX's VIDEO_CAPTURE overlay canvas. These pixels are therefore encoded in every
+     * recorded frame and survive sharing/exporting the original MP4.
+     */
+    private fun drawLiveHud(canvas: Canvas, telemetry: GpsTelemetry, unit: String) {
         val w = canvas.width.toFloat()
         val h = canvas.height.toFloat()
         if (w <= 0f || h <= 0f) return
 
-        val scale = (w / 1080f).coerceIn(0.65f, 2.5f)
-        val margin = 28f * scale
-        val panelW = 300f * scale
-        val panelH = 126f * scale
-        val left = w - panelW - margin
-        val top = h - panelH - margin
-        val radius = 18f * scale
+        val scale = (w / 1080f).coerceIn(0.55f, 2.6f)
+        val cyan = AndroidColor.rgb(69, 244, 255)
+        val green = AndroidColor.rgb(0, 245, 160)
+        val red = AndroidColor.rgb(255, 48, 79)
+        val white = AndroidColor.rgb(245, 251, 255)
+        val muted = AndroidColor.rgb(190, 211, 222)
 
-        val panel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = AndroidColor.argb(205, 7, 13, 20)
-            style = Paint.Style.FILL
-        }
-        canvas.drawRoundRect(left, top, left + panelW, top + panelH, radius, radius, panel)
+        fun paint(color: Int, size: Float, bold: Boolean = false, align: Paint.Align = Paint.Align.LEFT): Paint =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = color
+                textSize = size * scale
+                textAlign = align
+                typeface = Typeface.create(if (bold) Typeface.MONOSPACE else Typeface.DEFAULT, if (bold) Typeface.BOLD else Typeface.NORMAL)
+            }
 
-        val border = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = AndroidColor.rgb(0, 229, 255)
+        val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.argb(92, 4, 12, 20) }
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = AndroidColor.argb(185, cyan ushr 16 and 0xff, cyan ushr 8 and 0xff, cyan and 0xff)
             style = Paint.Style.STROKE
-            strokeWidth = 2f * scale
+            strokeWidth = 1.3f * scale
         }
-        canvas.drawRoundRect(left, top, left + panelW, top + panelH, radius, radius, border)
+        val top = 18f * scale
+        val margin = 24f * scale
+        val header = RectF(margin, top, w - margin, top + 42f * scale)
+        canvas.drawRoundRect(header, 16f * scale, 16f * scale, panelPaint)
+        canvas.drawRoundRect(header, 16f * scale, 16f * scale, borderPaint)
 
-        val gpsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = if (gpsFixed) AndroidColor.rgb(0, 230, 118) else AndroidColor.rgb(255, 55, 75)
-            style = Paint.Style.FILL
-        }
-        val gpsX = left + 22f * scale
-        val gpsY = top + 23f * scale
-        canvas.drawCircle(gpsX, gpsY, 6f * scale, gpsPaint)
+        val recPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = red }
+        canvas.drawCircle(margin + 15f * scale, top + 21f * scale, 6f * scale, recPaint)
+        canvas.drawText("AUTO REC", margin + 30f * scale, top + 27f * scale, paint(green, 15f, true))
+        canvas.drawText("1080p  60FPS  H.265", margin + 145f * scale, top + 26f * scale, paint(white, 11f))
+        val gpsColor = if (telemetry.isGpsFixed) green else red
+        canvas.drawCircle(w - margin - 175f * scale, top + 21f * scale, 5f * scale, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = gpsColor })
+        canvas.drawText(if (telemetry.isGpsFixed) "GPS LOCK" else "GPS SEARCH", w - margin - 162f * scale, top + 26f * scale, paint(white, 11f))
+        val batteryIntent = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+        val batteryLevel = batteryIntent?.getIntExtra("level", -1) ?: -1
+        val batteryScale = batteryIntent?.getIntExtra("scale", 100) ?: 100
+        val batteryPct = if (batteryLevel >= 0 && batteryScale > 0) batteryLevel * 100 / batteryScale else 0
+        canvas.drawText("BAT $batteryPct%", w - margin - 8f * scale, top + 26f * scale, paint(green, 11f, true, Paint.Align.RIGHT))
 
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = AndroidColor.rgb(190, 208, 220)
-            textSize = 15f * scale
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        }
-        canvas.drawText(if (gpsFixed) "GPS LOCK" else "GPS NO SIGNAL", left + 36f * scale, top + 28f * scale, labelPaint)
+        // Supporting telemetry at upper left/right.
+        canvas.drawText("ALT  ${telemetry.altitudeMeters.toInt()} m", margin + 4f * scale, top + 72f * scale, paint(white, 12f, true))
+        canvas.drawText("SAT  ${telemetry.satellitesCount}", margin + 4f * scale, top + 94f * scale, paint(muted, 11f))
+        canvas.drawText(
+            String.format(Locale.US, "%.5f, %.5f", telemetry.latitude, telemetry.longitude),
+            w - margin - 4f * scale, top + 72f * scale, paint(white, 11f, true, Paint.Align.RIGHT)
+        )
 
-        val speedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = AndroidColor.WHITE
-            textSize = 46f * scale
-            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+        // Large analog 0–200 km/h dial, with the needle driven by the current GPS sample.
+        val radius = minOf(w * 0.285f, h * 0.265f).coerceAtLeast(95f * scale)
+        val cx = w * 0.5f
+        val cy = if (h > w) h * 0.66f else h * 0.57f
+        val dialRect = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
+        val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = cyan
+            style = Paint.Style.STROKE
+            strokeWidth = 3f * scale
+            strokeCap = Paint.Cap.ROUND
         }
-        canvas.drawText(speed.coerceAtLeast(0f).toInt().toString(), left + 18f * scale, top + 78f * scale, speedPaint)
+        canvas.drawArc(dialRect, 135f, 270f, false, arc)
+        val redArc = Paint(arc).apply { color = red; strokeWidth = 4f * scale }
+        canvas.drawArc(dialRect, 135f + 270f * .82f, 48.6f, false, redArc)
 
-        val unitPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = AndroidColor.rgb(0, 229, 255)
-            textSize = 17f * scale
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        for (i in 0..100) {
+            val angle = Math.toRadians(135.0 + 270.0 * i / 100.0)
+            val major = i % 10 == 0
+            val mediumTick = i % 5 == 0
+            val inner = radius - (if (major) 19f else if (mediumTick) 13f else 7f) * scale
+            val outer = radius - 2f * scale
+            val color = if (i >= 82) red else cyan
+            val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                this.color = if (major) color else AndroidColor.argb(125, AndroidColor.red(color), AndroidColor.green(color), AndroidColor.blue(color))
+                strokeWidth = (if (major) 2.7f else 1f) * scale
+                strokeCap = Paint.Cap.ROUND
+            }
+            canvas.drawLine(
+                cx + kotlin.math.cos(angle).toFloat() * inner,
+                cy + kotlin.math.sin(angle).toFloat() * inner,
+                cx + kotlin.math.cos(angle).toFloat() * outer,
+                cy + kotlin.math.sin(angle).toFloat() * outer,
+                tickPaint
+            )
+            if (major) {
+                val labelRadius = radius - 38f * scale
+                val labelX = cx + kotlin.math.cos(angle).toFloat() * labelRadius
+                val labelY = cy + kotlin.math.sin(angle).toFloat() * labelRadius + 5f * scale
+                canvas.drawText((i * 2).toString(), labelX, labelY, paint(white, 13f, true, Paint.Align.CENTER))
+            }
         }
-        canvas.drawText(unit, left + 100f * scale, top + 77f * scale, unitPaint)
 
-        val detailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = AndroidColor.rgb(210, 221, 230)
-            textSize = 12f * scale
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        val speed = telemetry.speedKmh.coerceIn(0f, 200f)
+        val needleAngle = Math.toRadians(135.0 + 270.0 * speed / 200f)
+        val tipX = cx + kotlin.math.cos(needleAngle).toFloat() * radius * .77f
+        val tipY = cy + kotlin.math.sin(needleAngle).toFloat() * radius * .77f
+        val tailX = cx - kotlin.math.cos(needleAngle).toFloat() * radius * .12f
+        val tailY = cy - kotlin.math.sin(needleAngle).toFloat() * radius * .12f
+        canvas.drawLine(tailX, tailY, tipX, tipY, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.argb(95, 255, 48, 79); strokeWidth = 12f * scale; strokeCap = Paint.Cap.ROUND })
+        canvas.drawLine(tailX, tailY, tipX, tipY, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = red; strokeWidth = 4.5f * scale; strokeCap = Paint.Cap.ROUND })
+        canvas.drawCircle(cx, cy, 12f * scale, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.rgb(15, 25, 34) })
+        canvas.drawCircle(cx, cy, 12f * scale, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cyan; style = Paint.Style.STROKE; strokeWidth = 1.5f * scale })
+        canvas.drawText(speed.toInt().toString(), cx, cy + 66f * scale, paint(white, 52f, true, Paint.Align.CENTER))
+        canvas.drawText(unit, cx, cy + 89f * scale, paint(cyan, 14f, true, Paint.Align.CENTER))
+
+        // Compact transparent bottom telemetry strip.
+        val footerTop = h - 72f * scale
+        val footer = RectF(margin, footerTop, w - margin, h - 12f * scale)
+        canvas.drawRoundRect(footer, 9f * scale, 9f * scale, panelPaint)
+        canvas.drawRoundRect(footer, 9f * scale, 9f * scale, borderPaint)
+        val date = SimpleDateFormat("yyyy-MM-dd  HH:mm:ss", Locale.getDefault()).format(Date())
+        canvas.drawText(date, margin + 10f * scale, footerTop + 23f * scale, paint(white, 10f, true))
+        val stats = listOf(
+            "LAT/LON" to String.format(Locale.US, "%.4f / %.4f", telemetry.latitude, telemetry.longitude),
+            "ALT" to "${telemetry.altitudeMeters.toInt()} m",
+            "DIST" to String.format(Locale.US, "%.2f km", telemetry.distanceKm),
+            "MAX" to "${telemetry.maxSpeedKmh.toInt()} km/h",
+            "AVG" to "${telemetry.avgSpeedKmh.toInt()} km/h"
+        )
+        val statStart = margin + 210f * scale
+        val statWidth = (w - margin - statStart - 8f * scale) / stats.size
+        stats.forEachIndexed { index, stat ->
+            val x = statStart + index * statWidth
+            canvas.drawText(stat.first, x, footerTop + 20f * scale, paint(muted, 8.5f, true))
+            canvas.drawText(stat.second, x, footerTop + 39f * scale, paint(if (index >= 3) green else white, 9.5f, true))
+            if (index > 0) {
+                canvas.drawLine(x - 5f * scale, footerTop + 9f * scale, x - 5f * scale, footer.bottom - 8f * scale,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.argb(90, 69, 244, 255); strokeWidth = scale })
+            }
         }
-        canvas.drawText("MAX ${maxSpeed.toInt()}   DIST ${String.format(Locale.US, "%.1f", distanceKm)} km", left + 18f * scale, top + 106f * scale, detailPaint)
     }
 
     fun switchCamera(lifecycleOwner: LifecycleOwner, previewView: PreviewView, resolution: VideoResolution) {
