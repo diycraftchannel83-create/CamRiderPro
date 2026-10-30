@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,19 +37,19 @@ fun TelemetryVideoBannerOverlay(telemetry: GpsTelemetry,speedUnit: SpeedUnit,ove
  val max=telemetry.maxSpeedKmh*speedUnit.multiplierFromKmh
  val avg=telemetry.avgSpeedKmh*speedUnit.multiplierFromKmh
  Row(modifier.fillMaxWidth().background(CockpitBlack.copy(alpha=.60f),RoundedCornerShape(7.dp)).padding(horizontal=5.dp,vertical=7.dp).testTag("telemetry_video_banner"),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
-  Stat("DATE / TIME",dateTime.replace("|","\n"),Color.White)
+  Stat("DATE / TIME",dateTime.replace("|","\n"),Color.White,Modifier.weight(1f))
   if(overlayConfig.showCoordinates) {
-   Stat("LAT / LON",String.format(Locale.US,"%.5f\n%.5f",telemetry.latitude,telemetry.longitude),Color(0xFF45F4FF))
+   Stat("LAT / LON",String.format(Locale.US,"%.5f\n%.5f",telemetry.latitude,telemetry.longitude),Color(0xFF45F4FF),Modifier.weight(1f))
   }
-  Stat("ALT","${telemetry.altitudeMeters.toInt()} m",Color.White)
-  Stat("DIST",String.format(Locale.US,"%.2f km",telemetry.distanceKm),Color.White)
-  Stat("MAX","${max.toInt()} ${speedUnit.label}",Color(0xFF00F5A0))
-  Stat("AVG","${avg.toInt()} ${speedUnit.label}",Color(0xFF00F5A0))
+  Stat("ALT","${telemetry.altitudeMeters.toInt()} m",Color.White,Modifier.weight(1f))
+  Stat("DIST",String.format(Locale.US,"%.2f km",telemetry.distanceKm),Color.White,Modifier.weight(1f))
+  Stat("MAX","${max.toInt()} ${speedUnit.label}",Color(0xFF00F5A0),Modifier.weight(1f))
+  Stat("AVG","${avg.toInt()} ${speedUnit.label}",Color(0xFF00F5A0),Modifier.weight(1f))
  }
 }
 @Composable
-private fun Stat(label:String,value:String,color:Color) {
- Column(Modifier.weight(1f),horizontalAlignment=Alignment.CenterHorizontally) {
+private fun Stat(label:String,value:String,color:Color,modifier:Modifier=Modifier) {
+ Column(modifier,horizontalAlignment=Alignment.CenterHorizontally) {
   Text(label,color=HudMuted,fontSize=8.sp,fontWeight=FontWeight.Bold,maxLines=1)
   Text(value,color=color,fontSize=9.sp,fontWeight=FontWeight.Bold,fontFamily=FontFamily.Monospace,lineHeight=11.sp,maxLines=2)
  }
