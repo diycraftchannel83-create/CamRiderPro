@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import android.Manifest
 import android.content.res.Configuration
+import android.view.Surface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
@@ -132,6 +133,16 @@ fun CameraRiderScreen(
                 Manifest.permission.ACCESS_COARSE_LOCATION
             )
         )
+    }
+
+    // CameraX must receive the current display rotation as the device changes
+    // between portrait and landscape; otherwise MP4 files retain landscape orientation.
+    LaunchedEffect(isLandscape) {
+        previewViewRef?.let { preview ->
+            val rotation = preview.display?.rotation
+                ?: if (isLandscape) Surface.ROTATION_90 else Surface.ROTATION_0
+            viewModel.cameraManager.updateTargetRotation(rotation)
+        }
     }
 
     // Auto-dismiss banner messages after 3 seconds
