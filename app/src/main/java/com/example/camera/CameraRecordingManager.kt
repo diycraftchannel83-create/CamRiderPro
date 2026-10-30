@@ -10,6 +10,7 @@ import android.graphics.Typeface
 import android.graphics.PorterDuff
 import android.os.Handler
 import android.os.Looper
+import android.view.Surface
 import android.util.Log
 import android.content.ContentValues
 import android.os.Environment
@@ -49,6 +50,8 @@ class CameraRecordingManager(private val context: Context) {
     private var cameraProvider: ProcessCameraProvider? = null
     private var activeCamera: Camera? = null
     private var videoCapture: VideoCapture<Recorder>? = null
+    private var previewUseCase: Preview? = null
+    private var currentTargetRotation: Int = Surface.ROTATION_0
     private var liveHudEffect: OverlayEffect? = null
 
     /** Supplies the latest GPS values to the encoder-side HUD for every video frame. */
@@ -112,11 +115,16 @@ class CameraRecordingManager(private val context: Context) {
                 .requireLensFacing(currentLensFacing)
                 .build()
 
+            val targetRotation = previewView.display?.rotation ?: Surface.ROTATION_0
+            currentTargetRotation = targetRotation
+
             val preview = Preview.Builder()
+                .setTargetRotation(targetRotation)
                 .build()
                 .also {
                     it.surfaceProvider = previewView.surfaceProvider
                 }
+            previewUseCase = preview
 
             // Quality selector matching user choice
             val quality = when (resolution) {
@@ -134,7 +142,9 @@ class CameraRecordingManager(private val context: Context) {
                 .setQualitySelector(qualitySelector)
                 .build()
 
-            videoCapture = VideoCapture.withOutput(recorder)
+            videoCapture = VideoCapture.Builder(recorder)
+                .setTargetRotation(targetRotation)
+                .build()
 
             // OverlayEffect runs inside CameraX's video pipeline, so these pixels are encoded
             // into the MP4 itself instead of being added to the Compose preview only.
@@ -159,11 +169,17 @@ class CameraRecordingManager(private val context: Context) {
             }
             liveHudEffect = hudEffect
 
-            val useCaseGroup = UseCaseGroup.Builder()
+            val useCaseGroupBuilder = UseCaseGroup.Builder()
                 .addUseCase(preview)
                 .addUseCase(videoCapture!!)
                 .addEffect(hudEffect)
-                .build()
+
+            // Share PreviewView's viewport with VideoCapture so portrait recordings
+            // use the same crop/aspect framing as the on-screen camera preview.
+            previewView.viewPort?.let { viewPort ->
+                useCaseGroupBuilder.setViewPort(viewPort)
+            }
+            val useCaseGroup = useCaseGroupBuilder.build()
 
             activeCamera = provider.bindToLifecycle(
                 lifecycleOwner,
@@ -316,6 +332,23 @@ class CameraRecordingManager(private val context: Context) {
                 canvas.drawLine(x - 5f * scale, footerTop + 9f * scale, x - 5f * scale, footer.bottom - 8f * scale,
                     Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.argb(90, 69, 244, 255); strokeWidth = scale })
             }
+        }
+    }
+
+    /**
+     * Keep CameraX output rotation in sync with the device/display orientation.
+     * Updating both use cases lets the MP4 carry the correct portrait/landscape
+     * rotation metadata instead of always being encoded as landscape.
+     */
+    fun updateTargetRotation(rotation: Int) {
+        if (rotation == currentTargetRotation) return
+        currentTargetRotation = rotation
+        try {
+            previewUseCase?.targetRotation = rotation
+            videoCapture?.targetRotation = rotation
+            Log.i("CameraRecordingManager", "Updated video target rotation: $rotation")
+        } catch (e: Exception) {
+            Log.e("CameraRecordingManager", "Failed to update target rotation", e)
         }
     }
 
