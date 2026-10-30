@@ -1,6 +1,9 @@
 package com.example.ui
 
 import android.app.Application
+import android.media.AudioAttributes
+import android.speech.tts.UtteranceProgressListener
+import android.util.Log
 import android.speech.tts.TextToSpeech
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -65,13 +68,40 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
 
     private fun speak(message: String) {
         if (!ttsReady || !_settings.value.voiceAssistantEnabled) return
-        voiceTts?.speak(message, TextToSpeech.QUEUE_ADD, null, "camrider-${System.currentTimeMillis()}")
+        val utteranceId = "camrider-${System.currentTimeMillis()}"
+        val result = voiceTts?.speak(message, TextToSpeech.QUEUE_ADD, null, utteranceId)
+        if (result == TextToSpeech.ERROR) {
+            Log.e("CamRiderVoice", "TTS rejected utterance: $utteranceId")
+        }
     }
 
     init {
         voiceTts = TextToSpeech(application) { status ->
             ttsReady = status == TextToSpeech.SUCCESS
             if (ttsReady) {
+                // Navigation-guidance attributes are less disruptive to CameraX microphone capture
+                // than the default media playback usage on devices with aggressive audio-focus policies.
+                voiceTts?.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                voiceTts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {
+                        Log.d("CamRiderVoice", "TTS started: $utteranceId")
+                    }
+                    override fun onDone(utteranceId: String?) {
+                        Log.d("CamRiderVoice", "TTS completed: $utteranceId")
+                    }
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) {
+                        Log.e("CamRiderVoice", "TTS playback failed: $utteranceId")
+                    }
+                    override fun onError(utteranceId: String?, errorCode: Int) {
+                        Log.e("CamRiderVoice", "TTS playback failed ($errorCode): $utteranceId")
+                    }
+                })
                 val result = voiceTts?.setLanguage(Locale.US)
                 if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                     voiceTts?.setLanguage(Locale.getDefault())
