@@ -73,14 +73,9 @@ class TelemetryVideoExporter(private val context: Context) {
 
             val outputFile = File(moviesDir, outputFileName)
 
-            // Render crisp, high-contrast Telemetry Speedometer HUD Bitmap Overlay
-            val overlayBitmap = createSpeedometerOverlayBitmap(
-                width = 1920,
-                height = 1080,
-                session = session,
-                speedUnit = speedUnit
-            )
-
+            // CameraX VIDEO_CAPTURE OverlayEffect already burns the live HUD into each
+            // recorded frame. Do not add a second static bitmap here: that caused the
+            // exported file to show a duplicate/older dashboard over the live recording.
             // Media3 Transformer setup
             val inputUri = if (session.videoPath.startsWith("content://")) {
                 Uri.parse(session.videoPath)
@@ -88,13 +83,9 @@ class TelemetryVideoExporter(private val context: Context) {
                 Uri.fromFile(File(session.videoPath))
             }
 
-            val bitmapOverlay = BitmapOverlay.createStaticBitmapOverlay(overlayBitmap)
-            val overlayEffect = OverlayEffect(listOf(bitmapOverlay))
-
-            val effects = Effects(
-                emptyList(),
-                listOf<Effect>(overlayEffect)
-            )
+            // Preserve the HUD already embedded by CameraX in the source MP4.
+            // This export pass re-encodes/copies the video without painting a stale HUD.
+            val effects = Effects(emptyList(), emptyList())
 
             val mediaItem = MediaItem.fromUri(inputUri)
             val editedMediaItem = EditedMediaItem.Builder(mediaItem)
