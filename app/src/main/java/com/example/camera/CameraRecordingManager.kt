@@ -246,8 +246,9 @@ class CameraRecordingManager(private val context: Context) {
                      bold: Boolean = false, align: Paint.Align = Paint.Align.LEFT) {
             val p = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 this.color = color; textSize = size * scale; textAlign = align
-                typeface = Typeface.create(if (bold) Typeface.MONOSPACE else Typeface.DEFAULT,
+                typeface = Typeface.create(Typeface.MONOSPACE,
                     if (bold) Typeface.BOLD else Typeface.NORMAL)
+                if (bold) setShadowLayer(3.5f * scale, 0f, 0f, color)
             }
             canvas.drawText(value, x, y, p)
         }
@@ -297,23 +298,23 @@ class CameraRecordingManager(private val context: Context) {
         val infoLeft = compassCx + compassRadius + 12f * scale
         val infoRight = minOf(w * .43f, infoLeft + 142f * scale)
         val infoTop = headerBottom + 18f * scale
-        drawPanel(RectF(infoLeft, infoTop, infoRight, infoTop + 94f * scale), 9f)
-        drawText("ALT", infoLeft + 10f * scale, infoTop + 25f * scale, 10f, muted, true)
-        drawText(telemetry.altitudeMeters.toInt().toString() + " m", infoRight - 9f * scale, infoTop + 25f * scale, 12f, white, true, Paint.Align.RIGHT)
-        drawText("SAT", infoLeft + 10f * scale, infoTop + 52f * scale, 10f, muted, true)
-        drawText(telemetry.satellitesCount.toString(), infoRight - 9f * scale, infoTop + 52f * scale, 12f, white, true, Paint.Align.RIGHT)
-        drawText("BEARING", infoLeft + 10f * scale, infoTop + 79f * scale, 9f, muted, true)
-        drawText(telemetry.bearingDegrees.toInt().toString() + "°", infoRight - 9f * scale, infoTop + 79f * scale, 11f, green, true, Paint.Align.RIGHT)
+        drawPanel(RectF(infoLeft, infoTop, infoRight, infoTop + 102f * scale), 9f)
+        drawText("ALTITUDE", infoLeft + 10f * scale, infoTop + 27f * scale, 9f, muted, true)
+        drawText(telemetry.altitudeMeters.toInt().toString() + " m", infoRight - 9f * scale, infoTop + 29f * scale, 15f, cyan, true, Paint.Align.RIGHT)
+        drawText("SATELLITES", infoLeft + 10f * scale, infoTop + 61f * scale, 9f, muted, true)
+        drawText(telemetry.satellitesCount.toString(), infoRight - 9f * scale, infoTop + 63f * scale, 15f, green, true, Paint.Align.RIGHT)
+        drawText("HEADING", infoLeft + 10f * scale, infoTop + 94f * scale, 9f, muted, true)
+        drawText(telemetry.bearingDegrees.toInt().toString() + "°", infoRight - 9f * scale, infoTop + 96f * scale, 15f, AndroidColor.rgb(255, 211, 64), true, Paint.Align.RIGHT)
 
         // Upper-right panel shows real GPS coordinates, not invented weather/location data.
-        val rightPanel = RectF(w * .68f, infoTop, w - margin, infoTop + 94f * scale)
+        val rightPanel = RectF(w * .68f, infoTop, w - margin, infoTop + 102f * scale)
         drawPanel(rightPanel, 9f)
         drawText(if (telemetry.isGpsFixed) "GPS LOCKED" else "SEARCHING GPS",
-            rightPanel.centerX(), infoTop + 24f * scale, 10f, gpsColor, true, Paint.Align.CENTER)
+            rightPanel.centerX(), infoTop + 26f * scale, 11f, gpsColor, true, Paint.Align.CENTER)
         drawText(String.format(Locale.US, "LAT %.5f", telemetry.latitude),
-            rightPanel.centerX(), infoTop + 49f * scale, 9f, white, true, Paint.Align.CENTER)
+            rightPanel.centerX(), infoTop + 57f * scale, 12f, cyan, true, Paint.Align.CENTER)
         drawText(String.format(Locale.US, "LON %.5f", telemetry.longitude),
-            rightPanel.centerX(), infoTop + 73f * scale, 9f, white, true, Paint.Align.CENTER)
+            rightPanel.centerX(), infoTop + 86f * scale, 12f, green, true, Paint.Align.CENTER)
 
         // Analog speedometer is placed in the upper half, not at the bottom.
         val radius = minOf(w * .19f, h * .115f).coerceAtLeast(68f * scale)
@@ -348,7 +349,7 @@ class CameraRecordingManager(private val context: Context) {
                 drawText((i * 2).toString(),
                     cx + kotlin.math.cos(angle).toFloat() * labelRadius,
                     cy + kotlin.math.sin(angle).toFloat() * labelRadius + 4f * scale,
-                    11f, white, true, Paint.Align.CENTER)
+                    13f, cyan, true, Paint.Align.CENTER)
             }
         }
         val speed = telemetry.speedKmh.coerceIn(0f, 200f)
@@ -365,16 +366,16 @@ class CameraRecordingManager(private val context: Context) {
             Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.rgb(10, 22, 31) })
         canvas.drawCircle(cx, cy, 10f * scale,
             Paint(Paint.ANTI_ALIAS_FLAG).apply { color = cyan; style = Paint.Style.STROKE; strokeWidth = 1.5f * scale })
-        drawText(speed.toInt().toString(), cx, cy + 52f * scale, 39f, white, true, Paint.Align.CENTER)
-        drawText(unit, cx, cy + 72f * scale, 12f, cyan, true, Paint.Align.CENTER)
+        drawText(speed.toInt().toString(), cx, cy + 57f * scale, 46f, green, true, Paint.Align.CENTER)
+        drawText(unit, cx, cy + 81f * scale, 14f, cyan, true, Paint.Align.CENTER)
 
         // Permanent bottom telemetry strip, inset from all frame edges.
-        val footerHeight = 82f * scale
+        val footerHeight = 94f * scale
         val footerBottom = h - 10f * scale
         val footerTop = footerBottom - footerHeight
         drawPanel(RectF(margin, footerTop, w - margin, footerBottom), 9f)
         val date = SimpleDateFormat("yyyy-MM-dd  HH:mm:ss", Locale.getDefault()).format(Date())
-        drawText(date, margin + 9f * scale, footerTop + 19f * scale, 10f, white, true)
+        drawText(date, margin + 10f * scale, footerTop + 22f * scale, 12f, cyan, true)
         val stats = listOf(
             "ALT" to (telemetry.altitudeMeters.toInt().toString() + " m"),
             "DIST" to String.format(Locale.US, "%.2f km", telemetry.distanceKm),
@@ -385,12 +386,19 @@ class CameraRecordingManager(private val context: Context) {
         val statWidth = (w - 2f * margin) / stats.size
         stats.forEachIndexed { index, stat ->
             val centerX = margin + statWidth * (index + .5f)
-            drawText(stat.first, centerX, footerTop + 43f * scale, 9f, muted, true, Paint.Align.CENTER)
-            drawText(stat.second, centerX, footerTop + 65f * scale, 10f,
-                if (index == 2 || index == 3) green else white, true, Paint.Align.CENTER)
+            drawText(stat.first, centerX, footerTop + 51f * scale, 10f, muted, true, Paint.Align.CENTER)
+            val valueColor = when (index) {
+                0 -> cyan
+                1 -> AndroidColor.rgb(255, 211, 64)
+                2 -> red
+                3 -> green
+                else -> AndroidColor.rgb(255, 211, 64)
+            }
+            drawText(stat.second, centerX, footerTop + 80f * scale, 13f,
+                valueColor, true, Paint.Align.CENTER)
             if (index > 0) {
                 val dividerX = margin + statWidth * index
-                canvas.drawLine(dividerX, footerTop + 29f * scale, dividerX, footerBottom - 7f * scale,
+                canvas.drawLine(dividerX, footerTop + 35f * scale, dividerX, footerBottom - 7f * scale,
                     Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.argb(100, 69, 244, 255); strokeWidth = scale })
             }
         }
