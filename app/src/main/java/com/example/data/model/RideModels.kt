@@ -49,7 +49,12 @@ data class RecordingSettings(
     val targetFps: Int = 60,
     val audioEnabled: Boolean = true,
     val nightModeEnabled: Boolean = false,
-    val speedUnit: SpeedUnit = SpeedUnit.KMH
+    val speedUnit: SpeedUnit = SpeedUnit.KMH,
+    val voiceAssistantEnabled: Boolean = true,
+    val speedLimitAlertEnabled: Boolean = true,
+    val welcomeVoiceEnabled: Boolean = true,
+    val speedLimitKmh: Int = 50,
+    val alertRepeatSeconds: Int = 30
 )
 
 data class RideSession(
