@@ -21,8 +21,8 @@ data class GpsTelemetry(
     val altitudeMeters: Double = 0.0,
     val satellitesCount: Int = 0,
     val bearingDegrees: Float = 0f,
-    val gear: String = "N",
-    val rpm: Int = 1000,
+    val gear: String = "--",
+    val rpm: Int = 0,
     val isGpsFixed: Boolean = false,
     val accuracyMeters: Float = 0f,
     val locationHistory: List<LatLngPoint> = emptyList()
@@ -48,8 +48,6 @@ data class RecordingSettings(
     val resolution: VideoResolution = VideoResolution.RES_1080P,
     val targetFps: Int = 60,
     val audioEnabled: Boolean = true,
-    val autoRecordOnMove: Boolean = true,
-    val autoRecordThresholdKmh: Float = 5.0f,
     val nightModeEnabled: Boolean = false,
     val speedUnit: SpeedUnit = SpeedUnit.KMH
 )
