@@ -213,28 +213,33 @@ class CameraRecordingManager(private val context: Context) {
         // leaves the logical portrait origin outside the frame and clips the HUD.
         val normalizedRotation = ((rotationDegrees % 360) + 360) % 360
         val canvasSave = canvas.save()
-        val quarterTurn = normalizedRotation == 90 || normalizedRotation == 270
-        val w = if (quarterTurn) rawHeight else rawWidth
-        val h = if (quarterTurn) rawWidth else rawHeight
-        val transform = Matrix()
-        when (normalizedRotation) {
-            90 -> transform.setValues(floatArrayOf(
-                0f, -1f, rawWidth,
-                1f,  0f, 0f,
-                0f,  0f, 1f
-            ))
-            180 -> transform.setValues(floatArrayOf(
-                -1f, 0f, rawWidth,
-                 0f,-1f, rawHeight,
-                 0f, 0f, 1f
-            ))
-            270 -> transform.setValues(floatArrayOf(
-                0f, 1f, 0f,
-               -1f, 0f, rawHeight,
-                0f, 0f, 1f
-            ))
+
+        // OverlayEffect may provide a canvas that is already in the target orientation.
+        // Only remap coordinates when the actual buffer is landscape but CameraX will
+        // rotate that buffer into portrait. Never infer canvas dimensions from rotation
+        // alone: doing so double-rotates an already-portrait overlay and clips the HUD.
+        val needsPortraitRemap = rawWidth > rawHeight &&
+            (normalizedRotation == 90 || normalizedRotation == 270)
+        val w = if (needsPortraitRemap) rawHeight else rawWidth
+        val h = if (needsPortraitRemap) rawWidth else rawHeight
+
+        if (needsPortraitRemap) {
+            val transform = Matrix()
+            if (normalizedRotation == 90) {
+                transform.setValues(floatArrayOf(
+                    0f, -1f, rawWidth,
+                    1f,  0f, 0f,
+                    0f,  0f, 1f
+                ))
+            } else {
+                transform.setValues(floatArrayOf(
+                    0f, 1f, 0f,
+                   -1f, 0f, rawHeight,
+                    0f, 0f, 1f
+                ))
+            }
+            canvas.concat(transform)
         }
-        canvas.concat(transform)
 
         val scale = (w / 1080f).coerceIn(0.55f, 2.6f)
         val cyan = AndroidColor.rgb(69, 244, 255)
