@@ -58,7 +58,7 @@ class CameraRecordingManager(private val context: Context) {
     private var liveHudEffect: OverlayEffect? = null
 
     // CameraX OverlayEffect composes with OpenGL. Keep GL off the UI thread and
-    // rasterize the expensive HUD only 8 times/second instead of on every frame.
+    // refresh the HUD snapshot up to 15 times/second on a worker; CameraX composites it into every encoded frame.
     private val hudGlThread = HandlerThread("CamRider-OpenGL").apply { start() }
     private val hudGlHandler = Handler(hudGlThread.looper)
     private val hudRenderThread = HandlerThread("CamRider-HUD-Raster").apply { start() }
@@ -185,7 +185,7 @@ class CameraRecordingManager(private val context: Context) {
                 // the cached bitmap into CameraX's OpenGL overlay texture.
                 synchronized(hudBitmapLock) {
                     val sizeChanged = frameWidth != cachedHudWidth || frameHeight != cachedHudHeight
-                    val stale = now - cachedHudLastRenderMs >= 125L
+                    val stale = now - cachedHudLastRenderMs >= 66L
                     if ((sizeChanged || stale) && !hudRenderPending && frameWidth > 0 && frameHeight > 0) {
                         hudRenderPending = true
                         val crop = android.graphics.Rect(frame.cropRect)
