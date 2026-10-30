@@ -181,13 +181,6 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
         if (!newSettings.speedLimitAlertEnabled) speedAlertArmed = true
     }
 
-    override fun onCleared() {
-        voiceTts?.stop()
-        voiceTts?.shutdown()
-        voiceTts = null
-        super.onCleared()
-    }
-
     fun updateOverlayConfig(newConfig: OverlayConfig) {
         _overlayConfig.value = newConfig
     }
@@ -268,6 +261,9 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
     }
 
     override fun onCleared() {
+        voiceTts?.stop()
+        voiceTts?.shutdown()
+        voiceTts = null
         super.onCleared()
         gpsTracker.stopTracking()
         cameraManager.release()
