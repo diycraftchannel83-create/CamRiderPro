@@ -154,7 +154,7 @@ fun SettingsDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Section 2: Video & Auto Record
+                // Section 2: Video & Manual Record
                 SettingsSectionHeader("PENGATURAN REKAMAN", Icons.Default.Videocam)
                 SettingsCard {
                     Text(
@@ -289,7 +289,7 @@ fun SettingsDialog(
                     OverlayToggleItem("Koordinat GPS & Ketinggian", overlayConfig.showCoordinates) {
                         onOverlayConfigChange(overlayConfig.copy(showCoordinates = it))
                     }
-                    OverlayToggleItem("Indikator Gear / Gigi Motor", overlayConfig.showGearRpm) {
+                    OverlayToggleItem("Data Gear / RPM (OBD-II)", overlayConfig.showGearRpm) {
                         onOverlayConfigChange(overlayConfig.copy(showGearRpm = it))
                     }
                     OverlayToggleItem("Tanggal & Waktu Real-Time", overlayConfig.showDateTime) {
