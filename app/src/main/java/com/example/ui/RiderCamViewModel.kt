@@ -69,7 +69,7 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
     private fun speak(message: String) {
         if (!ttsReady || !_settings.value.voiceAssistantEnabled) return
         val utteranceId = "camrider-${System.currentTimeMillis()}"
-        val result = voiceTts?.speak(message, TextToSpeech.QUEUE_ADD, null, utteranceId)
+        val result = voiceTts?.speak(message, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
         if (result == TextToSpeech.ERROR) {
             Log.e("CamRiderVoice", "TTS rejected utterance: $utteranceId")
         }
@@ -123,9 +123,11 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
                 now - lastSpeedAlertAt >= TimeUnit.SECONDS.toMillis(prefs.alertRepeatSeconds.toLong())) {
                 speedAlertArmed = false
                 lastSpeedAlertAt = now
-                val currentSpeed = (data.speedKmh * prefs.speedUnit.multiplierFromKmh).toInt()
-                val unitName = if (prefs.speedUnit == com.example.data.model.SpeedUnit.MPH) "miles per hour" else "kilometers per hour"
-                speak("Your current speed is $currentSpeed $unitName. Please slow down.")
+                // The slider is explicitly calibrated and labelled in km/h.
+                // Announce that exact configured threshold so the spoken value always
+                // matches the number shown in Settings (not the fluctuating GPS speed).
+                val configuredLimitKmh = prefs.speedLimitKmh
+                speak("Speed limit is set to $configuredLimitKmh kilometers per hour. Please slow down.")
             }
         }.launchIn(viewModelScope)
 
