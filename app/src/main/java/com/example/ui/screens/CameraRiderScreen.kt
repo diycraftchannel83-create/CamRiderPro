@@ -199,29 +199,6 @@ fun CameraRiderScreen(
 
             if (isLandscape) {
                 // LANDSCAPE MOTORCYCLE COCKPIT LAYOUT
-                // Left: Handlebar Quick Action Bar
-                HandlebarControlBar(
-                    isRecording = isRecording,
-                    isAudioEnabled = settings.audioEnabled,
-                    isNightBoostActive = isNightBoostActive,
-                    isTorchActive = isTorchActive,
-                    onRecordToggle = { viewModel.toggleRecord() },
-                    onCameraSwitch = {
-                        previewViewRef?.let { pv ->
-                            viewModel.cameraManager.switchCamera(lifecycleOwner, pv, settings.resolution)
-                        }
-                    },
-                    onAudioToggle = { viewModel.toggleAudio() },
-                    onNightToggle = { viewModel.toggleNightBoost() },
-                    onTorchToggle = { viewModel.toggleTorch() },
-                    onLockScreen = { viewModel.lockScreen() },
-                    onOpenSettings = { showSettingsDialog = true },
-                    onOpenHistory = { showHistoryDialog = true },
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 8.dp)
-                )
-
                 // Top Right: Compass & Mini Route Map Radar
                 if (overlayConfig.showGpsMap) {
                     CompassMiniMapHud(
@@ -241,29 +218,6 @@ fun CameraRiderScreen(
                 )
             } else {
                 // PORTRAIT COCKPIT LAYOUT
-                // Right Action Bar with Record button in clear space
-                HandlebarControlBar(
-                    isRecording = isRecording,
-                    isAudioEnabled = settings.audioEnabled,
-                    isNightBoostActive = isNightBoostActive,
-                    isTorchActive = isTorchActive,
-                    onRecordToggle = { viewModel.toggleRecord() },
-                    onCameraSwitch = {
-                        previewViewRef?.let { pv ->
-                            viewModel.cameraManager.switchCamera(lifecycleOwner, pv, settings.resolution)
-                        }
-                    },
-                    onAudioToggle = { viewModel.toggleAudio() },
-                    onNightToggle = { viewModel.toggleNightBoost() },
-                    onTorchToggle = { viewModel.toggleTorch() },
-                    onLockScreen = { viewModel.lockScreen() },
-                    onOpenSettings = { showSettingsDialog = true },
-                    onOpenHistory = { showHistoryDialog = true },
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 8.dp)
-                )
-
                 // Route radar HUD - moved to TopStart (left side) so it NEVER overlaps the record button on the right!
                 if (overlayConfig.showGpsMap) {
                     CompassMiniMapHud(
@@ -338,7 +292,30 @@ fun CameraRiderScreen(
             }
         }
 
-        // LAYER 3 — ControlLayer / permissions: controls remain UI-only and are not drawn into the recording.
+        // LAYER 3 — ControlLayer: buttons are composed above the HUD and never sent to CameraX.
+        HandlebarControlBar(
+            isRecording = isRecording,
+            isAudioEnabled = settings.audioEnabled,
+            isNightBoostActive = isNightBoostActive,
+            isTorchActive = isTorchActive,
+            onRecordToggle = { viewModel.toggleRecord() },
+            onCameraSwitch = {
+                previewViewRef?.let { pv ->
+                    viewModel.cameraManager.switchCamera(lifecycleOwner, pv, settings.resolution)
+                }
+            },
+            onAudioToggle = { viewModel.toggleAudio() },
+            onNightToggle = { viewModel.toggleNightBoost() },
+            onTorchToggle = { viewModel.toggleTorch() },
+            onLockScreen = { viewModel.lockScreen() },
+            onOpenSettings = { showSettingsDialog = true },
+            onOpenHistory = { showHistoryDialog = true },
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 8.dp)
+        )
+
+        // Permission UI also belongs to the topmost control/application layer.
         if (!permissionsGranted) {
             Box(
                 modifier = Modifier
