@@ -8,6 +8,7 @@ on:
       - feature/futuristic-hud-dashboard
       - feature/hud-led-readability
       - feature/modular-3-layer-hud
+      - feature/gps-speedometer-manual-record
     paths:
       - '**.gradle'
       - '**.gradle.kts'

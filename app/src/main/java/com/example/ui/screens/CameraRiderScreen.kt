@@ -410,6 +410,7 @@ fun CameraRiderScreen(
         if (showHistoryDialog) {
             RideHistoryDialog(
                 rides = rides,
+                speedUnit = settings.speedUnit,
                 onDeleteRide = { viewModel.deleteRide(it) },
                 onDismiss = { showHistoryDialog = false }
             )

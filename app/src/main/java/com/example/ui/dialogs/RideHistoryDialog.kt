@@ -54,6 +54,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.FileProvider
 import com.example.data.model.RideSession
+import com.example.data.model.SpeedUnit
 import com.example.ui.theme.CockpitBlack
 import com.example.ui.theme.CockpitBorder
 import com.example.ui.theme.CockpitCard
@@ -72,6 +73,7 @@ import java.util.Locale
 @Composable
 fun RideHistoryDialog(
     rides: List<RideSession>,
+    speedUnit: SpeedUnit = SpeedUnit.KMH,
     onDeleteRide: (RideSession) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -218,6 +220,7 @@ fun RideHistoryDialog(
                         items(rides, key = { it.id }) { ride ->
                             RideSessionItem(
                                 ride = ride,
+                                speedUnit = speedUnit,
                                 onPlay = { selectedVideoForPlayback = ride },
                                 onDelete = { onDeleteRide(ride) },
                                 onShare = {
@@ -259,6 +262,7 @@ fun RideHistoryDialog(
 @Composable
 private fun RideSessionItem(
     ride: RideSession,
+    speedUnit: SpeedUnit,
     onPlay: () -> Unit,
     onDelete: () -> Unit,
     onShare: () -> Unit
@@ -338,8 +342,8 @@ private fun RideSessionItem(
             ) {
                 MetricItem("DURASI", durationText, NeonGreen)
                 MetricItem("JARAK", String.format("%.1f km", ride.distanceKm), HudWhite)
-                MetricItem("MAX", String.format("%.0f km/h", ride.maxSpeedKmh), NeonYellow)
-                MetricItem("AVG", String.format("%.0f km/h", ride.avgSpeedKmh), NeonCyan)
+                MetricItem("MAX", String.format(Locale.getDefault(), "%.0f %s", ride.maxSpeedKmh * speedUnit.multiplierFromKmh, speedUnit.label), NeonYellow)
+                MetricItem("AVG", String.format(Locale.getDefault(), "%.0f %s", ride.avgSpeedKmh * speedUnit.multiplierFromKmh, speedUnit.label), NeonCyan)
             }
 
             Spacer(modifier = Modifier.height(8.dp))

@@ -54,6 +54,7 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
     val isSimulating: StateFlow<Boolean> = _isSimulating.asStateFlow()
 
     val exportState: StateFlow<com.example.export.ExportState> = videoExporter.exportState
+    private var recordingTelemetrySnapshot: GpsTelemetry? = null
 
     init {
         // Observe saved rides from database
@@ -65,6 +66,9 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
         // recorded MP4 contains the live speed/GPS HUD without a post-recording export.
         cameraManager.telemetryProvider = { telemetry.value }
         cameraManager.speedUnitLabelProvider = { _settings.value.speedUnit.label }
+        cameraManager.videoProfileLabelProvider = {
+            "${_settings.value.resolution.label.substringBefore(" ")}  ${_settings.value.targetFps}FPS H.265"
+        }
 
         // On recording saved handler
         cameraManager.onRecordingSaved = { videoUri, displayPath, duration ->
@@ -82,11 +86,14 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
 
     fun toggleRecord() {
         if (cameraManager.isRecording.value) {
+            // Freeze trip metrics at the user's stop action; encoder finalization is asynchronous.
+            recordingTelemetrySnapshot = telemetry.value
             cameraManager.stopRecording()
             _bannerMessage.value = "Perekaman selesai & tersimpan otomatis"
         } else {
             // Every manual recording starts with a clean trip accumulator.
             gpsTracker.resetTrip()
+            recordingTelemetrySnapshot = null
             cameraManager.startRecording(_settings.value.audioEnabled)
             _bannerMessage.value = "Perekaman manual dimulai"
         }
@@ -166,7 +173,8 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
 
     private fun saveRideToDatabase(videoUri: String, displayPath: String, durationSeconds: Long) {
         viewModelScope.launch {
-            val telem = telemetry.value
+            val telem = recordingTelemetrySnapshot ?: telemetry.value
+            recordingTelemetrySnapshot = null
             val dateStr = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()).format(Date())
 
             val session = RideSession(

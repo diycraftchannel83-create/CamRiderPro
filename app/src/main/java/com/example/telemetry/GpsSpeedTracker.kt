@@ -56,7 +56,12 @@ class GpsSpeedTracker(private val context: Context) {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
             // Count satellites actually used in the current position fix, not an accuracy-based estimate.
             gnssSatellitesUsed = (0 until status.satelliteCount).count { status.usedInFix(it) }
-            _telemetry.value = _telemetry.value.copy(satellitesCount = gnssSatellitesUsed)
+            if (!isSimulating) {
+                _telemetry.value = _telemetry.value.copy(
+                    satellitesCount = gnssSatellitesUsed,
+                    isGpsFixed = gnssSatellitesUsed > 0
+                )
+            }
         }
     }
 
@@ -171,7 +176,7 @@ class GpsSpeedTracker(private val context: Context) {
             bearingDegrees = bearing,
             gear = "--",
             rpm = 0,
-            isGpsFixed = true,
+            isGpsFixed = gnssSatellitesUsed > 0,
             accuracyMeters = loc.accuracy,
             locationHistory = routeTrail.toList()
         )
