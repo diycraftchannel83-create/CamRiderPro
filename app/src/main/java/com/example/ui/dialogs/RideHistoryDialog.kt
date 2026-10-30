@@ -122,7 +122,7 @@ fun RideHistoryDialog(
                     }
                 }
 
-                // If video playback is selected, show embedded video player preview with Speedometer overlay!
+                // Playback shows the original recording; the live HUD is already embedded in the MP4.
                 selectedVideoForPlayback?.let { session ->
                     Spacer(modifier = Modifier.height(10.dp))
                     Box(
@@ -150,6 +150,7 @@ fun RideHistoryDialog(
                             },
                             modifier = Modifier.matchParentSize()
                         )
+                    }
 
                     Spacer(modifier = Modifier.height(6.dp))
 
