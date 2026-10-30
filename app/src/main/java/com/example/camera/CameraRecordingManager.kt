@@ -225,23 +225,26 @@ class CameraRecordingManager(private val context: Context) {
 
         if (needsPortraitRemap) {
             val transform = Matrix()
+            // OverlayEffect's buffer transform is opposite to the MP4 display
+            // rotation. Use the inverse quarter-turn so the burned HUD is upright
+            // after the video player's rotation metadata is applied.
             if (normalizedRotation == 90) {
-                transform.setValues(floatArrayOf(
-                    0f, -1f, rawWidth,
-                    1f,  0f, 0f,
-                    0f,  0f, 1f
-                ))
-            } else {
                 transform.setValues(floatArrayOf(
                     0f, 1f, 0f,
                    -1f, 0f, rawHeight,
                     0f, 0f, 1f
                 ))
+            } else {
+                transform.setValues(floatArrayOf(
+                    0f, -1f, rawWidth,
+                    1f,  0f, 0f,
+                    0f,  0f, 1f
+                ))
             }
             canvas.concat(transform)
         }
 
-        val scale = (w / 1080f).coerceIn(0.55f, 2.6f)
+        val scale = (w / if (h > w) 720f else 1080f).coerceIn(0.85f, 2.6f)
         val cyan = AndroidColor.rgb(69, 244, 255)
         val green = AndroidColor.rgb(0, 245, 160)
         val red = AndroidColor.rgb(255, 48, 79)
@@ -344,28 +347,39 @@ class CameraRecordingManager(private val context: Context) {
         canvas.drawText(speed.toInt().toString(), cx, cy + 66f * scale, paint(white, 52f, true, Paint.Align.CENTER))
         canvas.drawText(unit, cx, cy + 89f * scale, paint(cyan, 14f, true, Paint.Align.CENTER))
 
-        // Compact transparent bottom telemetry strip.
-        val footerTop = h - 72f * scale
+        // Compact two-row footer: date/time and GPS coordinates on top,
+        // five equally spaced trip metrics below. Portrait text is deliberately larger.
+        val footerHeight = 104f * scale
+        val footerTop = h - footerHeight - 12f * scale
         val footer = RectF(margin, footerTop, w - margin, h - 12f * scale)
         canvas.drawRoundRect(footer, 9f * scale, 9f * scale, panelPaint)
         canvas.drawRoundRect(footer, 9f * scale, 9f * scale, borderPaint)
         val date = SimpleDateFormat("yyyy-MM-dd  HH:mm:ss", Locale.getDefault()).format(Date())
-        canvas.drawText(date, margin + 10f * scale, footerTop + 23f * scale, paint(white, 10f, true))
+        canvas.drawText(date, margin + 10f * scale, footerTop + 22f * scale, paint(white, 12f, true))
+        canvas.drawText(
+            String.format(Locale.US, "%.5f, %.5f", telemetry.latitude, telemetry.longitude),
+            w - margin - 10f * scale, footerTop + 22f * scale,
+            paint(cyan, 11f, true, Paint.Align.RIGHT)
+        )
+        canvas.drawLine(margin + 8f * scale, footerTop + 31f * scale, w - margin - 8f * scale, footerTop + 31f * scale,
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.argb(75, 69, 244, 255); strokeWidth = scale })
         val stats = listOf(
-            "LAT/LON" to String.format(Locale.US, "%.4f / %.4f", telemetry.latitude, telemetry.longitude),
             "ALT" to "${telemetry.altitudeMeters.toInt()} m",
             "DIST" to String.format(Locale.US, "%.2f km", telemetry.distanceKm),
             "MAX" to "${telemetry.maxSpeedKmh.toInt()} km/h",
-            "AVG" to "${telemetry.avgSpeedKmh.toInt()} km/h"
+            "AVG" to "${telemetry.avgSpeedKmh.toInt()} km/h",
+            "SAT" to telemetry.satellitesCount.toString()
         )
-        val statStart = margin + 210f * scale
-        val statWidth = (w - margin - statStart - 8f * scale) / stats.size
+        val statWidth = (w - 2f * margin - 16f * scale) / stats.size
         stats.forEachIndexed { index, stat ->
-            val x = statStart + index * statWidth
-            canvas.drawText(stat.first, x, footerTop + 20f * scale, paint(muted, 8.5f, true))
-            canvas.drawText(stat.second, x, footerTop + 39f * scale, paint(if (index >= 3) green else white, 9.5f, true))
+            val x = margin + 8f * scale + index * statWidth
+            val centerX = x + statWidth / 2f
+            canvas.drawText(stat.first, centerX, footerTop + 53f * scale,
+                paint(muted, 11f, true, Paint.Align.CENTER))
+            canvas.drawText(stat.second, centerX, footerTop + 76f * scale,
+                paint(if (index == 2 || index == 3) green else white, 12f, true, Paint.Align.CENTER))
             if (index > 0) {
-                canvas.drawLine(x - 5f * scale, footerTop + 9f * scale, x - 5f * scale, footer.bottom - 8f * scale,
+                canvas.drawLine(x, footerTop + 39f * scale, x, footer.bottom - 8f * scale,
                     Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.argb(90, 69, 244, 255); strokeWidth = scale })
             }
         }
