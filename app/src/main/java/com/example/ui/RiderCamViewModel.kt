@@ -65,6 +65,9 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
         // recorded MP4 contains the live speed/GPS HUD without a post-recording export.
         cameraManager.telemetryProvider = { telemetry.value }
         cameraManager.speedUnitLabelProvider = { _settings.value.speedUnit.label }
+        cameraManager.videoProfileLabelProvider = {
+            "${_settings.value.resolution.label.substringBefore(" ")}  ${_settings.value.targetFps}FPS H.265"
+        }
 
         // On recording saved handler
         cameraManager.onRecordingSaved = { videoUri, displayPath, duration ->
