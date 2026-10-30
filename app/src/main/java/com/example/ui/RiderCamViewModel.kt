@@ -134,6 +134,7 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
             _isSimulating.value = false
             _bannerMessage.value = "Simulasi dimatikan: GPS asli aktif"
         } else {
+            gpsTracker.resetTrip()
             gpsTracker.startRideSimulation()
             _isSimulating.value = true
             _bannerMessage.value = "Simulasi perjalanan motor aktif!"
