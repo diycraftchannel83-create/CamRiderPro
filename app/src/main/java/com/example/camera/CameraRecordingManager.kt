@@ -160,12 +160,16 @@ class CameraRecordingManager(private val context: Context) {
             hudEffect.setOnDrawListener { frame ->
                 val canvas = frame.overlayCanvas
                 canvas.drawColor(AndroidColor.TRANSPARENT, PorterDuff.Mode.CLEAR)
-                val telemetry = telemetryProvider?.invoke()
-                if (telemetry != null) {
-                    drawLiveHud(canvas, telemetry, speedUnitLabelProvider?.invoke() ?: "km/h", activeCamera?.cameraInfo?.getSensorRotationDegrees(currentTargetRotation) ?: 0)
-                } else {
-                    drawLiveHud(canvas, GpsTelemetry(), speedUnitLabelProvider?.invoke() ?: "km/h", activeCamera?.cameraInfo?.getSensorRotationDegrees(currentTargetRotation) ?: 0)
-                }
+                val telemetry = telemetryProvider?.invoke() ?: GpsTelemetry()
+                // Use the exact transformation metadata attached to this output frame.
+                // Sensor rotation can differ from the crop/rotation CameraX applies here.
+                drawLiveHud(
+                    canvas = canvas,
+                    telemetry = telemetry,
+                    unit = speedUnitLabelProvider?.invoke() ?: "km/h",
+                    cropRect = frame.cropRect,
+                    rotationDegrees = frame.rotationDegrees
+                )
                 true
             }
             liveHudEffect = hudEffect
@@ -201,48 +205,52 @@ class CameraRecordingManager(private val context: Context) {
      * CameraX's VIDEO_CAPTURE overlay canvas. These pixels are therefore encoded in every
      * recorded frame and survive sharing/exporting the original MP4.
      */
-    private fun drawLiveHud(canvas: Canvas, telemetry: GpsTelemetry, unit: String, rotationDegrees: Int) {
-        val rawWidth = canvas.width.toFloat()
-        val rawHeight = canvas.height.toFloat()
-        if (rawWidth <= 0f || rawHeight <= 0f) return
+    private fun drawLiveHud(
+        canvas: Canvas,
+        telemetry: GpsTelemetry,
+        unit: String,
+        cropRect: android.graphics.Rect,
+        rotationDegrees: Int
+    ) {
+        // CameraX applies crop first, then rotation, then optional mirroring.
+        // Draw only inside the valid crop and map logical HUD coordinates back
+        // into the unrotated overlay buffer using this frame's own metadata.
+        val cropWidth = cropRect.width().toFloat()
+        val cropHeight = cropRect.height().toFloat()
+        if (cropWidth <= 0f || cropHeight <= 0f) return
 
-        // Build a logical HUD canvas in the final displayed orientation.
-        // CameraX stores landscape sensor buffers and applies MP4 rotation metadata;
-        // map the portrait HUD coordinates into that raw buffer with the matching
-        // inverse transform (including translation). Rotating around the center alone
-        // leaves the logical portrait origin outside the frame and clips the HUD.
         val normalizedRotation = ((rotationDegrees % 360) + 360) % 360
+        val quarterTurn = normalizedRotation == 90 || normalizedRotation == 270
+        val w = if (quarterTurn) cropHeight else cropWidth
+        val h = if (quarterTurn) cropWidth else cropHeight
         val canvasSave = canvas.save()
 
-        // OverlayEffect may provide a canvas that is already in the target orientation.
-        // Only remap coordinates when the actual buffer is landscape but CameraX will
-        // rotate that buffer into portrait. Never infer canvas dimensions from rotation
-        // alone: doing so double-rotates an already-portrait overlay and clips the HUD.
-        val needsPortraitRemap = rawWidth > rawHeight &&
-            (normalizedRotation == 90 || normalizedRotation == 270)
-        val w = if (needsPortraitRemap) rawHeight else rawWidth
-        val h = if (needsPortraitRemap) rawWidth else rawHeight
-
-        if (needsPortraitRemap) {
-            val transform = Matrix()
-            // OverlayEffect's buffer transform is opposite to the MP4 display
-            // rotation. Use the inverse quarter-turn so the burned HUD is upright
-            // after the video player's rotation metadata is applied.
-            if (normalizedRotation == 90) {
-                transform.setValues(floatArrayOf(
-                    0f, 1f, 0f,
-                   -1f, 0f, rawHeight,
-                    0f, 0f, 1f
-                ))
-            } else {
-                transform.setValues(floatArrayOf(
-                    0f, -1f, rawWidth,
-                    1f,  0f, 0f,
-                    0f,  0f, 1f
-                ))
-            }
-            canvas.concat(transform)
+        // Clip in raw buffer coordinates before applying the inverse transform.
+        canvas.clipRect(cropRect)
+        val transform = Matrix()
+        when (normalizedRotation) {
+            90 -> transform.setValues(floatArrayOf(
+                0f, 1f, cropRect.left.toFloat(),
+                -1f, 0f, cropRect.bottom.toFloat(),
+                0f, 0f, 1f
+            ))
+            180 -> transform.setValues(floatArrayOf(
+                -1f, 0f, cropRect.right.toFloat(),
+                0f, -1f, cropRect.bottom.toFloat(),
+                0f, 0f, 1f
+            ))
+            270 -> transform.setValues(floatArrayOf(
+                0f, -1f, cropRect.right.toFloat(),
+                1f, 0f, cropRect.top.toFloat(),
+                0f, 0f, 1f
+            ))
+            else -> transform.setValues(floatArrayOf(
+                1f, 0f, cropRect.left.toFloat(),
+                0f, 1f, cropRect.top.toFloat(),
+                0f, 0f, 1f
+            ))
         }
+        canvas.concat(transform)
 
         val scale = (w / if (h > w) 720f else 1080f).coerceIn(0.85f, 2.6f)
         val cyan = AndroidColor.rgb(69, 244, 255)
