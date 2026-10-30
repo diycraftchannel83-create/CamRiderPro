@@ -223,9 +223,41 @@ fun SettingsDialog(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Satuan Kecepatan",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = HudWhite
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(top = 6.dp)
+                    ) {
+                        SpeedUnit.values().forEach { unit ->
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        if (settings.speedUnit == unit) NeonGreen else CockpitBlack,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .border(1.dp, CockpitBorder, RoundedCornerShape(8.dp))
+                                    .clickable { onSettingsChange(settings.copy(speedUnit = unit)) }
+                                    .padding(horizontal = 18.dp, vertical = 8.dp)
+                                    .testTag("speed_unit_${unit.name.lowercase()}")
+                            ) {
+                                Text(
+                                    text = unit.label.uppercase(),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (settings.speedUnit == unit) Color.Black else HudWhite
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "Lokasi Penyimpanan Video:",
                         fontSize = 11.sp,
