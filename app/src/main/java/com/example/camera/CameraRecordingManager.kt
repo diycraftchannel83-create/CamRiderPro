@@ -202,7 +202,7 @@ class CameraRecordingManager(private val context: Context) {
                                 } else {
                                     rendered.eraseColor(AndroidColor.TRANSPARENT)
                                 }
-                                val targetBitmap = rendered
+                                val targetBitmap = rendered ?: throw IllegalStateException("HUD bitmap allocation failed")
                                 val rasterCanvas = Canvas(targetBitmap)
                                 val telemetry = telemetryProvider?.invoke() ?: GpsTelemetry()
                                 drawLiveHud(
@@ -230,7 +230,12 @@ class CameraRecordingManager(private val context: Context) {
                                 }
                             } catch (error: Throwable) {
                                 Log.e("CameraRecordingManager", "HUD raster update failed", error)
-                                synchronized(hudBitmapLock) { hudRenderPending = false }
+                                synchronized(hudBitmapLock) {
+                                    if (reusableTarget != null && spareHudBitmap === reusableTarget) {
+                                        spareHudBitmap = null
+                                    }
+                                    hudRenderPending = false
+                                }
                             } finally {
                                 rendered?.recycle()
                                 newSpare?.recycle()
