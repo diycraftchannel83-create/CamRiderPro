@@ -190,6 +190,16 @@ class CameraRecordingManager(private val context: Context) {
                         hudRenderPending = true
                         val crop = android.graphics.Rect(frame.cropRect)
                         val rotation = frame.rotationDegrees
+                        // Keep the HUD bitmap smaller than the encoded frame to reduce
+                        // its ARGB_8888 memory footprint. Draw coordinates remain in frame
+                        // space; Canvas scaling maps them into the smaller raster.
+                        val bitmapScale = when {
+                            maxOf(frameWidth, frameHeight) >= 3000 -> 0.50f // 4K
+                            maxOf(frameWidth, frameHeight) >= 1800 -> 0.75f // 1080p
+                            else -> 1.00f // 720p and below
+                        }
+                        val bitmapWidth = (frameWidth * bitmapScale).toInt().coerceAtLeast(1)
+                        val bitmapHeight = (frameHeight * bitmapScale).toInt().coerceAtLeast(1)
                         val replaceBuffers = sizeChanged || cachedHudBitmap == null || spareHudBitmap == null
                         val reusableTarget = if (replaceBuffers) null else spareHudBitmap
                         hudRenderHandler.post {
@@ -197,14 +207,15 @@ class CameraRecordingManager(private val context: Context) {
                             var newSpare: Bitmap? = null
                             try {
                                 val targetBitmap = reusableTarget ?: Bitmap.createBitmap(
-                                    frameWidth, frameHeight, Bitmap.Config.ARGB_8888
+                                    bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888
                                 ).also { rendered = it }
                                 if (replaceBuffers) {
-                                    newSpare = Bitmap.createBitmap(frameWidth, frameHeight, Bitmap.Config.ARGB_8888)
+                                    newSpare = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
                                 } else {
                                     targetBitmap.eraseColor(AndroidColor.TRANSPARENT)
                                 }
                                 val rasterCanvas = Canvas(targetBitmap)
+                                rasterCanvas.scale(bitmapScale, bitmapScale)
                                 val telemetry = telemetryProvider?.invoke() ?: GpsTelemetry()
                                 drawLiveHud(
                                     canvas = rasterCanvas,
@@ -244,7 +255,15 @@ class CameraRecordingManager(private val context: Context) {
                         }
                     }
                     // Lock protects the cached bitmap from being recycled while copied.
-                    cachedHudBitmap?.let { outputCanvas.drawBitmap(it, 0f, 0f, null) }
+                    cachedHudBitmap?.let {
+                        // Scale the lower-resolution HUD raster to the full video frame.
+                        outputCanvas.drawBitmap(
+                            it,
+                            null,
+                            RectF(0f, 0f, frameWidth.toFloat(), frameHeight.toFloat()),
+                            null
+                        )
+                    }
                 }
                 true
             }
