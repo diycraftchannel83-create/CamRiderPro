@@ -65,13 +65,13 @@ fun HandlebarControlBar(
     Column(
         modifier = modifier
             .background(
-                color = CockpitBlack.copy(alpha = 0.85f),
+                color = CockpitBlack.copy(alpha = 0.16f),
                 shape = RoundedCornerShape(20.dp)
             )
-            .border(1.dp, CockpitBorder, RoundedCornerShape(20.dp))
-            .padding(vertical = 8.dp, horizontal = 6.dp),
+            .border(1.dp, NeonCyan.copy(alpha = 0.30f), RoundedCornerShape(28.dp))
+            .padding(vertical = 7.dp, horizontal = 5.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         // Record Action Big Button
         RecordActionButton(
@@ -155,8 +155,9 @@ private fun RecordActionButton(
 
     Box(
         modifier = Modifier
-            .size(52.dp)
-            .background(bgColor, CircleShape)
+            .size(50.dp)
+            .background(CockpitBlack.copy(alpha = 0.32f), CircleShape)
+            .border(2.dp, if (isRecording) NeonRed else NeonGreen, CircleShape)
             .clickable { onClick() }
             .testTag("btn_record_toggle"),
         contentAlignment = Alignment.Center
@@ -164,7 +165,7 @@ private fun RecordActionButton(
         Icon(
             imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.PlayArrow,
             contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
-            tint = Color.Black,
+            tint = if (isRecording) NeonRed else NeonGreen,
             modifier = Modifier.size(28.dp)
         )
     }
@@ -181,9 +182,9 @@ private fun HandlebarIconButton(
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(42.dp)
-            .background(CockpitCard.copy(alpha = 0.8f), CircleShape)
-            .border(1.dp, CockpitBorder.copy(alpha = 0.6f), CircleShape)
+            .size(44.dp)
+            .background(CockpitBlack.copy(alpha = 0.28f), CircleShape)
+            .border(1.dp, NeonCyan.copy(alpha = 0.48f), CircleShape)
             .testTag(testTag)
     ) {
         Icon(
