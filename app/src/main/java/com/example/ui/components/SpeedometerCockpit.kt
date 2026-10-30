@@ -52,7 +52,7 @@ fun SpeedometerCockpit(telemetry: GpsTelemetry, speedUnit: SpeedUnit, showGearRp
   Column(horizontalAlignment=Alignment.CenterHorizontally) {
    Text(speedUnit.label,color=Color(0xFF45F4FF),fontSize=12.sp,fontWeight=FontWeight.SemiBold)
    Text(needle.toInt().toString(),color=Color.White,fontSize=if(isLandscape)42.sp else 48.sp,fontWeight=FontWeight.Black,fontFamily=FontFamily.Monospace)
-   if(showGearRpm) Text("OBD-II  --",color=Color(0xFF00F5A0),fontSize=10.sp,fontWeight=FontWeight.Bold)
+   if(showGearRpm) Text("GEAR / RPM  --",color=Color(0xFF00F5A0),fontSize=10.sp,fontWeight=FontWeight.Bold)
   }
  }
 }
