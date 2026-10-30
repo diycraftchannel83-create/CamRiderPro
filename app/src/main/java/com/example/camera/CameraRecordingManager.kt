@@ -65,6 +65,7 @@ class CameraRecordingManager(private val context: Context) {
     private val hudRenderHandler = Handler(hudRenderThread.looper)
     private val hudBitmapLock = Any()
     private var cachedHudBitmap: Bitmap? = null
+    private var spareHudBitmap: Bitmap? = null
     private var cachedHudWidth = 0
     private var cachedHudHeight = 0
     private var cachedHudLastRenderMs = 0L
@@ -189,11 +190,20 @@ class CameraRecordingManager(private val context: Context) {
                         hudRenderPending = true
                         val crop = android.graphics.Rect(frame.cropRect)
                         val rotation = frame.rotationDegrees
+                        val replaceBuffers = sizeChanged || cachedHudBitmap == null || spareHudBitmap == null
+                        val reusableTarget = if (replaceBuffers) null else spareHudBitmap
                         hudRenderHandler.post {
-                            var rendered: Bitmap? = null
+                            var rendered: Bitmap? = reusableTarget
+                            var newSpare: Bitmap? = null
                             try {
-                                rendered = Bitmap.createBitmap(frameWidth, frameHeight, Bitmap.Config.ARGB_8888)
-                                val rasterCanvas = Canvas(rendered)
+                                if (rendered == null) {
+                                    rendered = Bitmap.createBitmap(frameWidth, frameHeight, Bitmap.Config.ARGB_8888)
+                                    newSpare = Bitmap.createBitmap(frameWidth, frameHeight, Bitmap.Config.ARGB_8888)
+                                } else {
+                                    rendered.eraseColor(AndroidColor.TRANSPARENT)
+                                }
+                                val targetBitmap = rendered
+                                val rasterCanvas = Canvas(targetBitmap)
                                 val telemetry = telemetryProvider?.invoke() ?: GpsTelemetry()
                                 drawLiveHud(
                                     canvas = rasterCanvas,
@@ -203,20 +213,27 @@ class CameraRecordingManager(private val context: Context) {
                                     rotationDegrees = rotation
                                 )
                                 synchronized(hudBitmapLock) {
-                                    val previous = cachedHudBitmap
-                                    cachedHudBitmap = rendered
+                                    val previousActive = cachedHudBitmap
+                                    val previousSpare = spareHudBitmap
+                                    cachedHudBitmap = targetBitmap
+                                    spareHudBitmap = if (replaceBuffers) newSpare else previousActive
                                     cachedHudWidth = frameWidth
                                     cachedHudHeight = frameHeight
                                     cachedHudLastRenderMs = SystemClock.elapsedRealtime()
                                     hudRenderPending = false
                                     rendered = null
-                                    previous?.recycle()
+                                    newSpare = null
+                                    if (replaceBuffers) {
+                                        previousActive?.recycle()
+                                        previousSpare?.recycle()
+                                    }
                                 }
                             } catch (error: Throwable) {
                                 Log.e("CameraRecordingManager", "HUD raster update failed", error)
                                 synchronized(hudBitmapLock) { hudRenderPending = false }
                             } finally {
                                 rendered?.recycle()
+                                newSpare?.recycle()
                             }
                         }
                     }
@@ -609,7 +626,9 @@ class CameraRecordingManager(private val context: Context) {
         hudGlHandler.removeCallbacksAndMessages(null)
         synchronized(hudBitmapLock) {
             cachedHudBitmap?.recycle()
+            spareHudBitmap?.recycle()
             cachedHudBitmap = null
+            spareHudBitmap = null
             cachedHudWidth = 0
             cachedHudHeight = 0
             hudRenderPending = false
