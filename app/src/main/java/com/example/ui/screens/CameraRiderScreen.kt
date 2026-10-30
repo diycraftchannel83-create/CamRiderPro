@@ -208,8 +208,8 @@ fun CameraRiderScreen(
                     onOpenSettings = { showSettingsDialog = true },
                     onOpenHistory = { showHistoryDialog = true },
                     modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(start = 12.dp)
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 8.dp)
                 )
 
                 // Top Right: Compass & Mini Route Map Radar
@@ -292,49 +292,6 @@ fun CameraRiderScreen(
                             showGearRpm = overlayConfig.showGearRpm,
                             isLandscape = false,
                             modifier = Modifier.padding(bottom = 6.dp)
-                        )
-                    }
-
-                    // Bottom Row: Settings Button shifted to bottom + Storage Path indicator
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = { showSettingsDialog = true },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = CockpitCard.copy(alpha = 0.92f),
-                                contentColor = HudWhite
-                            ),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, CockpitBorder),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.testTag("btn_bottom_settings")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Pengaturan",
-                                tint = NeonYellow,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "PENGATURAN",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = HudWhite
-                            )
-                        }
-
-                        Text(
-                            text = "📁 0://Movies/RiderCam/",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = NeonCyan,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                         )
                     }
 
