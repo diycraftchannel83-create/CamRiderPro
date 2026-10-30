@@ -101,7 +101,6 @@ fun CameraRiderScreen(
     val rides by viewModel.rides.collectAsState()
     val bannerMessage by viewModel.bannerMessage.collectAsState()
     val isSimulating by viewModel.isSimulating.collectAsState()
-    val exportState by viewModel.exportState.collectAsState()
 
     var showSettingsDialog by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
@@ -158,7 +157,7 @@ fun CameraRiderScreen(
             .fillMaxSize()
             .background(CockpitBlack)
     ) {
-        // 1. Live Camera Preview Layer
+        // LAYER 1 — CameraPreviewLayer: live camera only.
         AndroidView(
             factory = { ctx ->
                 PreviewView(ctx).apply {
@@ -182,7 +181,7 @@ fun CameraRiderScreen(
             )
         }
 
-        // 2. Telemetry HUD Layer
+        // LAYER 2 — TelemetryHUDLayer: Compose preview HUD. CameraX OverlayEffect burns its matching HUD into the MP4.
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
@@ -200,29 +199,6 @@ fun CameraRiderScreen(
 
             if (isLandscape) {
                 // LANDSCAPE MOTORCYCLE COCKPIT LAYOUT
-                // Left: Handlebar Quick Action Bar
-                HandlebarControlBar(
-                    isRecording = isRecording,
-                    isAudioEnabled = settings.audioEnabled,
-                    isNightBoostActive = isNightBoostActive,
-                    isTorchActive = isTorchActive,
-                    onRecordToggle = { viewModel.toggleRecord() },
-                    onCameraSwitch = {
-                        previewViewRef?.let { pv ->
-                            viewModel.cameraManager.switchCamera(lifecycleOwner, pv, settings.resolution)
-                        }
-                    },
-                    onAudioToggle = { viewModel.toggleAudio() },
-                    onNightToggle = { viewModel.toggleNightBoost() },
-                    onTorchToggle = { viewModel.toggleTorch() },
-                    onLockScreen = { viewModel.lockScreen() },
-                    onOpenSettings = { showSettingsDialog = true },
-                    onOpenHistory = { showHistoryDialog = true },
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 8.dp)
-                )
-
                 // Top Right: Compass & Mini Route Map Radar
                 if (overlayConfig.showGpsMap) {
                     CompassMiniMapHud(
@@ -230,19 +206,6 @@ fun CameraRiderScreen(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(top = 54.dp, end = 12.dp)
-                    )
-                }
-
-                // Bottom Center: Speedometer Cockpit Gauge
-                if (overlayConfig.showSpeedometer) {
-                    SpeedometerCockpit(
-                        telemetry = telemetry,
-                        speedUnit = settings.speedUnit,
-                        showGearRpm = overlayConfig.showGearRpm,
-                        isLandscape = true,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 34.dp)
                     )
                 }
 
@@ -255,29 +218,6 @@ fun CameraRiderScreen(
                 )
             } else {
                 // PORTRAIT COCKPIT LAYOUT
-                // Right Action Bar with Record button in clear space
-                HandlebarControlBar(
-                    isRecording = isRecording,
-                    isAudioEnabled = settings.audioEnabled,
-                    isNightBoostActive = isNightBoostActive,
-                    isTorchActive = isTorchActive,
-                    onRecordToggle = { viewModel.toggleRecord() },
-                    onCameraSwitch = {
-                        previewViewRef?.let { pv ->
-                            viewModel.cameraManager.switchCamera(lifecycleOwner, pv, settings.resolution)
-                        }
-                    },
-                    onAudioToggle = { viewModel.toggleAudio() },
-                    onNightToggle = { viewModel.toggleNightBoost() },
-                    onTorchToggle = { viewModel.toggleTorch() },
-                    onLockScreen = { viewModel.lockScreen() },
-                    onOpenSettings = { showSettingsDialog = true },
-                    onOpenHistory = { showHistoryDialog = true },
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .padding(end = 8.dp)
-                )
-
                 // Route radar HUD - moved to TopStart (left side) so it NEVER overlaps the record button on the right!
                 if (overlayConfig.showGpsMap) {
                     CompassMiniMapHud(
@@ -296,22 +236,25 @@ fun CameraRiderScreen(
                         .padding(horizontal = 8.dp, vertical = 2.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (overlayConfig.showSpeedometer) {
-                        SpeedometerCockpit(
-                            telemetry = telemetry,
-                            speedUnit = settings.speedUnit,
-                            showGearRpm = overlayConfig.showGearRpm,
-                            isLandscape = false,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-                    }
-
                     TelemetryVideoBannerOverlay(
                         telemetry = telemetry,
                         speedUnit = settings.speedUnit,
                         overlayConfig = overlayConfig
                     )
                 }
+            }
+
+            // Speedometer stays in the upper HUD zone in both orientations.
+            if (overlayConfig.showSpeedometer) {
+                SpeedometerCockpit(
+                    telemetry = telemetry,
+                    speedUnit = settings.speedUnit,
+                    showGearRpm = overlayConfig.showGearRpm,
+                    isLandscape = isLandscape,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = if (isLandscape) 76.dp else 142.dp)
+                )
             }
 
             // Floating Notification Toast/Banner
@@ -349,7 +292,30 @@ fun CameraRiderScreen(
             }
         }
 
-        // 3. Permission Request Card if not yet granted
+        // LAYER 3 — ControlLayer: buttons are composed above the HUD and never sent to CameraX.
+        HandlebarControlBar(
+            isRecording = isRecording,
+            isAudioEnabled = settings.audioEnabled,
+            isNightBoostActive = isNightBoostActive,
+            isTorchActive = isTorchActive,
+            onRecordToggle = { viewModel.toggleRecord() },
+            onCameraSwitch = {
+                previewViewRef?.let { pv ->
+                    viewModel.cameraManager.switchCamera(lifecycleOwner, pv, settings.resolution)
+                }
+            },
+            onAudioToggle = { viewModel.toggleAudio() },
+            onNightToggle = { viewModel.toggleNightBoost() },
+            onTorchToggle = { viewModel.toggleTorch() },
+            onLockScreen = { viewModel.lockScreen() },
+            onOpenSettings = { showSettingsDialog = true },
+            onOpenHistory = { showHistoryDialog = true },
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 8.dp)
+        )
+
+        // Permission UI also belongs to the topmost control/application layer.
         if (!permissionsGranted) {
             Box(
                 modifier = Modifier
@@ -444,10 +410,7 @@ fun CameraRiderScreen(
         if (showHistoryDialog) {
             RideHistoryDialog(
                 rides = rides,
-                exportState = exportState,
                 onDeleteRide = { viewModel.deleteRide(it) },
-                onExportWithSpeedometer = { viewModel.exportVideoWithSpeedometer(it) },
-                onResetExportState = { viewModel.resetExportState() },
                 onDismiss = { showHistoryDialog = false }
             )
         }

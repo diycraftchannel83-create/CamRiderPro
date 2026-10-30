@@ -3,7 +3,6 @@ package com.example.ui.dialogs
 import android.content.Intent
 import android.net.Uri
 import android.widget.VideoView
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -26,16 +25,13 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsBike
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -58,7 +54,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.FileProvider
 import com.example.data.model.RideSession
-import com.example.export.ExportState
 import com.example.ui.theme.CockpitBlack
 import com.example.ui.theme.CockpitBorder
 import com.example.ui.theme.CockpitCard
@@ -77,10 +72,7 @@ import java.util.Locale
 @Composable
 fun RideHistoryDialog(
     rides: List<RideSession>,
-    exportState: ExportState,
     onDeleteRide: (RideSession) -> Unit,
-    onExportWithSpeedometer: (RideSession) -> Unit,
-    onResetExportState: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
@@ -130,137 +122,7 @@ fun RideHistoryDialog(
                     }
                 }
 
-                // If export is in progress, show Export Status Card
-                AnimatedVisibility(visible = exportState !is ExportState.Idle) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
-                            .background(CockpitBlack, RoundedCornerShape(12.dp))
-                            .border(1.dp, NeonGreen, RoundedCornerShape(12.dp))
-                            .padding(12.dp)
-                    ) {
-                        when (exportState) {
-                            is ExportState.Exporting -> {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(24.dp),
-                                        color = NeonGreen,
-                                        strokeWidth = 2.5.dp
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(
-                                            text = "Mengekspor video dengan spedometer...",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = HudWhite
-                                        )
-                                        Text(
-                                            text = "Progress: ${exportState.progressPercent}%",
-                                            fontSize = 11.sp,
-                                            color = NeonGreen,
-                                            fontFamily = FontFamily.Monospace
-                                        )
-                                    }
-                                }
-                            }
-                            is ExportState.Success -> {
-                                Column {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = null,
-                                            tint = NeonGreen,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = "Video Berhasil Diekspor dengan Spedometer!",
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = NeonGreen
-                                        )
-                                    }
-                                    Text(
-                                        text = exportState.outputDisplayPath,
-                                        fontSize = 11.sp,
-                                        color = NeonCyan,
-                                        fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier.padding(vertical = 4.dp)
-                                    )
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.End
-                                    ) {
-                                        Button(
-                                            onClick = {
-                                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                                                    type = "video/mp4"
-                                                    putExtra(Intent.EXTRA_STREAM, exportState.outputUri)
-                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                }
-                                                context.startActivity(
-                                                    Intent.createChooser(shareIntent, "Bagikan Video RiderCam")
-                                                )
-                                            },
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = NeonGreen,
-                                                contentColor = Color.Black
-                                            ),
-                                            shape = RoundedCornerShape(8.dp),
-                                            modifier = Modifier.padding(end = 6.dp)
-                                        ) {
-                                            Text("Bagikan Video", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                        Button(
-                                            onClick = onResetExportState,
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = CockpitCard,
-                                                contentColor = HudWhite
-                                            ),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Text("Tutup", fontSize = 11.sp)
-                                        }
-                                    }
-                                }
-                            }
-                            is ExportState.Error -> {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.ErrorOutline,
-                                            contentDescription = null,
-                                            tint = NeonRed,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = exportState.errorMessage,
-                                            fontSize = 11.sp,
-                                            color = NeonRed
-                                        )
-                                    }
-                                    Button(
-                                        onClick = onResetExportState,
-                                        colors = ButtonDefaults.buttonColors(containerColor = CockpitCard),
-                                        shape = RoundedCornerShape(6.dp)
-                                    ) {
-                                        Text("OK", fontSize = 10.sp)
-                                    }
-                                }
-                            }
-                            is ExportState.Idle -> {}
-                        }
-                    }
-                }
-
-                // If video playback is selected, show embedded video player preview with Speedometer overlay!
+                // Playback shows the original recording; the live HUD is already embedded in the MP4.
                 selectedVideoForPlayback?.let { session ->
                     Spacer(modifier = Modifier.height(10.dp))
                     Box(
@@ -288,65 +150,6 @@ fun RideHistoryDialog(
                             },
                             modifier = Modifier.matchParentSize()
                         )
-
-                        // Live Speedometer Cockpit HUD burned onto player preview
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp)
-                        ) {
-                            // Top left Playback badge
-                            Row(
-                                modifier = Modifier
-                                    .align(Alignment.TopStart)
-                                    .background(CockpitBlack.copy(alpha = 0.85f), RoundedCornerShape(6.dp))
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "● PLAYBACK HUD 4K",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NeonGreen
-                                )
-                            }
-
-                            // Bottom Cockpit Gauge Overlay on video
-                            Row(
-                                modifier = Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .background(CockpitBlack.copy(alpha = 0.88f), RoundedCornerShape(10.dp))
-                                    .border(1.dp, NeonGreen.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-                                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    val cruisingSpeed = (session.maxSpeedKmh * 0.72f).toInt()
-                                    Text(
-                                        text = "$cruisingSpeed",
-                                        fontSize = 20.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = HudWhite,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                    Text("km/h", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = "GEAR 4  •  MAX ${session.maxSpeedKmh.toInt()} km/h",
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = NeonYellow
-                                    )
-                                    Text(
-                                        text = String.format("LAT %.4f LON %.4f", session.endLat, session.endLon),
-                                        fontSize = 8.sp,
-                                        color = NeonCyan,
-                                        fontFamily = FontFamily.Monospace
-                                    )
-                                }
-                            }
-                        }
                     }
 
                     Spacer(modifier = Modifier.height(6.dp))
@@ -416,7 +219,6 @@ fun RideHistoryDialog(
                             RideSessionItem(
                                 ride = ride,
                                 onPlay = { selectedVideoForPlayback = ride },
-                                onExport = { onExportWithSpeedometer(ride) },
                                 onDelete = { onDeleteRide(ride) },
                                 onShare = {
                                     try {
@@ -458,7 +260,6 @@ fun RideHistoryDialog(
 private fun RideSessionItem(
     ride: RideSession,
     onPlay: () -> Unit,
-    onExport: () -> Unit,
     onDelete: () -> Unit,
     onShare: () -> Unit
 ) {
@@ -543,52 +344,25 @@ private fun RideSessionItem(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Primary Actions: Play Video & Export Video with Speedometer Overlay
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // Playback action only. The saved recording already contains its live HUD.
+            Button(
+                onClick = onPlay,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = CockpitBlack,
+                    contentColor = HudWhite
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, CockpitBorder),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Button(
-                    onClick = onPlay,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = CockpitBlack,
-                        contentColor = HudWhite
-                    ),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CockpitBorder),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Play",
-                        tint = NeonGreen,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Putar Video", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-
-                Button(
-                    onClick = onExport,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = NeonGreen,
-                        contentColor = Color.Black
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.weight(1.3f).testTag("btn_export_speedometer")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Speed,
-                        contentDescription = "Export Speedometer",
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Ekspor + Spedometer",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Play",
+                    tint = NeonGreen,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Putar Video", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
