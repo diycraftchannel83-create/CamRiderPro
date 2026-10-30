@@ -18,7 +18,6 @@ import androidx.media3.common.Effect
 import androidx.media3.common.MediaItem
 import androidx.media3.effect.BitmapOverlay
 import androidx.media3.effect.OverlayEffect
-import androidx.media3.effect.Presentation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.Effects
@@ -86,8 +85,9 @@ class TelemetryVideoExporter(private val context: Context) {
 
             // Preserve the HUD already embedded by CameraX in the source MP4.
             // This export pass re-encodes/copies the video without painting a stale HUD.
-            val portraitPresentation = Presentation.createForAspectRatio(9f / 16f, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP)
-            val effects = Effects(emptyList(), listOf(portraitPresentation))
+            // Keep the original CameraX frame size and rotation metadata. The live HUD is
+            // already burned into the frame; a second 9:16 center-crop cuts its left/right edges.
+            val effects = Effects(emptyList(), emptyList())
 
             val mediaItem = MediaItem.fromUri(inputUri)
             val editedMediaItem = EditedMediaItem.Builder(mediaItem)
