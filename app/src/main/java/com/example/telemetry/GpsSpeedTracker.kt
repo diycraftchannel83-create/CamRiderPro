@@ -3,6 +3,9 @@ package com.example.telemetry
 import android.annotation.SuppressLint
 import android.content.Context
 import android.location.Location
+import android.location.LocationManager
+import android.location.GnssStatus
+import android.os.Handler
 import android.os.Looper
 import com.example.data.model.GpsTelemetry
 import com.example.data.model.LatLngPoint
@@ -37,7 +40,11 @@ class GpsSpeedTracker(private val context: Context) {
     private var lastLocation: Location? = null
     private var totalDistanceMeters: Double = 0.0
     private var maxRecordedSpeedKmh: Float = 0f
-    private val speedReadings = mutableListOf<Float>()
+    // Running sum/count keeps the average over the complete trip without a rolling 300-sample window.
+    private var speedSampleSumKmh: Double = 0.0
+    private var speedSampleCount: Long = 0L
+    private var gnssSatellitesUsed = 0
+    private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     private val routeTrail = mutableListOf<LatLngPoint>()
 
     private var isTracking = false
@@ -45,11 +52,13 @@ class GpsSpeedTracker(private val context: Context) {
     private var simulationJob: Job? = null
     private val trackerScope = CoroutineScope(Dispatchers.Default)
 
-    // Auto record listener
-    var onAutoRecordTrigger: ((Boolean) -> Unit)? = null
-    var autoRecordThresholdKmh: Float = 5.0f
-    var isAutoRecordEnabled: Boolean = true
-    private var consecutiveMovingSeconds = 0
+    private val gnssStatusCallback = object : GnssStatus.Callback() {
+        override fun onSatelliteStatusChanged(status: GnssStatus) {
+            // Count satellites actually used in the current position fix, not an accuracy-based estimate.
+            gnssSatellitesUsed = (0 until status.satelliteCount).count { status.usedInFix(it) }
+            _telemetry.value = _telemetry.value.copy(satellitesCount = gnssSatellitesUsed)
+        }
+    }
 
     private val locationCallback = object : LocationCallback() {
         override fun onLocationResult(result: LocationResult) {
@@ -72,6 +81,7 @@ class GpsSpeedTracker(private val context: Context) {
 
         try {
             fusedClient.requestLocationUpdates(request, locationCallback, Looper.getMainLooper())
+            locationManager.registerGnssStatusCallback(gnssStatusCallback, Handler(Looper.getMainLooper()))
         } catch (_: SecurityException) {
             // Handled via Compose permission flow; fallback to initial state
         }
@@ -82,24 +92,28 @@ class GpsSpeedTracker(private val context: Context) {
         stopSimulation()
         try {
             fusedClient.removeLocationUpdates(locationCallback)
+            locationManager.unregisterGnssStatusCallback(gnssStatusCallback)
         } catch (_: Exception) {
         }
     }
 
     fun resetTrip() {
+        // Clear every accumulator and previous fix so the first new GPS point becomes the new origin.
+        lastLocation = null
         totalDistanceMeters = 0.0
         maxRecordedSpeedKmh = 0f
-        speedReadings.clear()
+        speedSampleSumKmh = 0.0
+        speedSampleCount = 0L
         routeTrail.clear()
-        consecutiveMovingSeconds = 0
         _telemetry.value = _telemetry.value.copy(
             speedKmh = 0f,
             maxSpeedKmh = 0f,
             avgSpeedKmh = 0f,
             distanceKm = 0f,
             locationHistory = emptyList(),
-            gear = "N",
-            rpm = 1100
+            gear = "--",
+            rpm = 0,
+            satellitesCount = gnssSatellitesUsed
         )
     }
 
@@ -125,16 +139,12 @@ class GpsSpeedTracker(private val context: Context) {
             maxRecordedSpeedKmh = rawSpeedKmh
         }
 
-        if (rawSpeedKmh > 0f) {
-            speedReadings.add(rawSpeedKmh)
-            if (speedReadings.size > 300) speedReadings.removeAt(0)
-        }
-
-        val avgSpeed = if (speedReadings.isNotEmpty()) {
-            speedReadings.average().toFloat()
-        } else {
-            0f
-        }
+        // Include every GPS sample (including stopped/zero-speed samples) in trip average.
+        speedSampleSumKmh += rawSpeedKmh.toDouble()
+        speedSampleCount++
+        val avgSpeed = if (speedSampleCount > 0L) {
+            (speedSampleSumKmh / speedSampleCount).toFloat()
+        } else 0f
 
         val bearing = if (loc.hasBearing()) {
             loc.bearing
@@ -142,21 +152,11 @@ class GpsSpeedTracker(private val context: Context) {
             _telemetry.value.bearingDegrees
         }
 
-        // Motorcycle Gear & RPM synthesis
-        val (gear, rpm) = calculateGearAndRpm(rawSpeedKmh)
-
         // Route breadcrumb update
         val point = LatLngPoint(loc.latitude, loc.longitude, rawSpeedKmh)
         if (routeTrail.isEmpty() || rawSpeedKmh > 1f) {
             routeTrail.add(point)
             if (routeTrail.size > 200) routeTrail.removeAt(0)
-        }
-
-        // Satellites heuristic
-        val sats = if (loc.extras?.containsKey("satellites") == true) {
-            loc.extras?.getInt("satellites") ?: 14
-        } else {
-            if (loc.accuracy < 10f) 18 else if (loc.accuracy < 25f) 12 else 7
         }
 
         _telemetry.value = GpsTelemetry(
@@ -167,59 +167,15 @@ class GpsSpeedTracker(private val context: Context) {
             latitude = loc.latitude,
             longitude = loc.longitude,
             altitudeMeters = loc.altitude,
-            satellitesCount = sats,
+            satellitesCount = gnssSatellitesUsed,
             bearingDegrees = bearing,
-            gear = gear,
-            rpm = rpm,
+            gear = "--",
+            rpm = 0,
             isGpsFixed = true,
             accuracyMeters = loc.accuracy,
             locationHistory = routeTrail.toList()
         )
 
-        // Auto-record trigger check
-        checkAutoRecord(rawSpeedKmh)
-    }
-
-    private fun checkAutoRecord(speed: Float) {
-        if (!isAutoRecordEnabled) return
-        if (speed >= autoRecordThresholdKmh) {
-            consecutiveMovingSeconds++
-            if (consecutiveMovingSeconds >= 2) {
-                onAutoRecordTrigger?.invoke(true)
-            }
-        } else {
-            consecutiveMovingSeconds = 0
-        }
-    }
-
-    private fun calculateGearAndRpm(speed: Float): Pair<String, Int> {
-        return when {
-            speed < 1.0f -> "N" to 1150
-            speed < 25.0f -> {
-                val ratio = (speed / 25f).coerceIn(0f, 1f)
-                "1" to (2200 + (ratio * 4500).toInt())
-            }
-            speed < 45.0f -> {
-                val ratio = ((speed - 25f) / 20f).coerceIn(0f, 1f)
-                "2" to (3000 + (ratio * 4500).toInt())
-            }
-            speed < 68.0f -> {
-                val ratio = ((speed - 45f) / 23f).coerceIn(0f, 1f)
-                "3" to (3400 + (ratio * 4600).toInt())
-            }
-            speed < 90.0f -> {
-                val ratio = ((speed - 68f) / 22f).coerceIn(0f, 1f)
-                "4" to (3800 + (ratio * 4800).toInt())
-            }
-            speed < 118.0f -> {
-                val ratio = ((speed - 90f) / 28f).coerceIn(0f, 1f)
-                "5" to (4200 + (ratio * 5000).toInt())
-            }
-            else -> {
-                val ratio = ((speed - 118f) / 60f).coerceIn(0f, 1f)
-                "6" to (4800 + (ratio * 6500).toInt().coerceAtMost(13000))
-            }
-        }
     }
 
     /**
@@ -267,10 +223,8 @@ class GpsSpeedTracker(private val context: Context) {
                 if (currentSimSpeed > maxRecordedSpeedKmh) {
                     maxRecordedSpeedKmh = currentSimSpeed
                 }
-                speedReadings.add(currentSimSpeed)
-                if (speedReadings.size > 300) speedReadings.removeAt(0)
-
-                val (gear, rpm) = calculateGearAndRpm(currentSimSpeed)
+                speedSampleSumKmh += currentSimSpeed.toDouble()
+                speedSampleCount++
                 val pt = LatLngPoint(curLat, curLon, currentSimSpeed)
                 routeTrail.add(pt)
                 if (routeTrail.size > 200) routeTrail.removeAt(0)
@@ -278,21 +232,20 @@ class GpsSpeedTracker(private val context: Context) {
                 _telemetry.value = GpsTelemetry(
                     speedKmh = currentSimSpeed,
                     maxSpeedKmh = maxRecordedSpeedKmh,
-                    avgSpeedKmh = speedReadings.average().toFloat(),
+                    avgSpeedKmh = (speedSampleSumKmh / speedSampleCount).toFloat(),
                     distanceKm = (totalDistanceMeters / 1000.0).toFloat(),
                     latitude = curLat,
                     longitude = curLon,
                     altitudeMeters = curAlt,
-                    satellitesCount = 18,
+                    satellitesCount = 0,
                     bearingDegrees = heading,
-                    gear = gear,
-                    rpm = rpm,
+                    gear = "--",
+                    rpm = 0,
                     isGpsFixed = true,
                     accuracyMeters = 3.5f,
                     locationHistory = routeTrail.toList()
                 )
 
-                checkAutoRecord(currentSimSpeed)
                 delay(500)
             }
         }

@@ -154,7 +154,7 @@ fun SettingsDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Section 2: Video & Auto Record
+                // Section 2: Video & Manual Record
                 SettingsSectionHeader("PENGATURAN REKAMAN", Icons.Default.Videocam)
                 SettingsCard {
                     Text(
@@ -225,49 +225,6 @@ fun SettingsDialog(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Auto-record on moving
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Perekaman Otomatis Saat Melaju",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = HudWhite
-                            )
-                            Text(
-                                text = "Merekam otomatis ketika motor melaju > ${settings.autoRecordThresholdKmh.toInt()} km/h",
-                                fontSize = 10.sp,
-                                color = HudMuted
-                            )
-                        }
-                        Switch(
-                            checked = settings.autoRecordOnMove,
-                            onCheckedChange = { onSettingsChange(settings.copy(autoRecordOnMove = it)) },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.Black,
-                                checkedTrackColor = NeonGreen
-                            ),
-                            modifier = Modifier.testTag("switch_autorecord")
-                        )
-                    }
-
-                    if (settings.autoRecordOnMove) {
-                        Slider(
-                            value = settings.autoRecordThresholdKmh,
-                            onValueChange = { onSettingsChange(settings.copy(autoRecordThresholdKmh = it)) },
-                            valueRange = 3f..25f,
-                            steps = 4,
-                            colors = SliderDefaults.colors(
-                                thumbColor = NeonGreen,
-                                activeTrackColor = NeonGreen
-                            )
-                        )
-                    }
-
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = "Lokasi Penyimpanan Video:",
@@ -332,7 +289,7 @@ fun SettingsDialog(
                     OverlayToggleItem("Koordinat GPS & Ketinggian", overlayConfig.showCoordinates) {
                         onOverlayConfigChange(overlayConfig.copy(showCoordinates = it))
                     }
-                    OverlayToggleItem("Indikator Gear / Gigi Motor", overlayConfig.showGearRpm) {
+                    OverlayToggleItem("Data Gear / RPM (OBD-II)", overlayConfig.showGearRpm) {
                         onOverlayConfigChange(overlayConfig.copy(showGearRpm = it))
                     }
                     OverlayToggleItem("Tanggal & Waktu Real-Time", overlayConfig.showDateTime) {

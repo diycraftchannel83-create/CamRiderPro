@@ -352,7 +352,8 @@ class CameraRecordingManager(private val context: Context) {
                     13f, cyan, true, Paint.Align.CENTER)
             }
         }
-        val speed = telemetry.speedKmh.coerceIn(0f, 200f)
+        val unitMultiplier = if (unit.equals("mph", ignoreCase = true)) 0.621371f else 1f
+        val speed = (telemetry.speedKmh * unitMultiplier).coerceIn(0f, 200f)
         val needleAngle = Math.toRadians(135.0 + 270.0 * speed / 200f)
         val tipX = cx + kotlin.math.cos(needleAngle).toFloat() * radius * .76f
         val tipY = cy + kotlin.math.sin(needleAngle).toFloat() * radius * .76f
@@ -379,8 +380,8 @@ class CameraRecordingManager(private val context: Context) {
         val stats = listOf(
             "ALT" to (telemetry.altitudeMeters.toInt().toString() + " m"),
             "DIST" to String.format(Locale.US, "%.2f km", telemetry.distanceKm),
-            "MAX" to (telemetry.maxSpeedKmh.toInt().toString() + " km/h"),
-            "AVG" to (telemetry.avgSpeedKmh.toInt().toString() + " km/h"),
+            "MAX" to ((telemetry.maxSpeedKmh * unitMultiplier).toInt().toString() + " " + unit),
+            "AVG" to ((telemetry.avgSpeedKmh * unitMultiplier).toInt().toString() + " " + unit),
             "SAT" to telemetry.satellitesCount.toString()
         )
         val statWidth = (w - 2f * margin) / stats.size
