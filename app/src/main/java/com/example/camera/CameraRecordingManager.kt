@@ -161,9 +161,9 @@ class CameraRecordingManager(private val context: Context) {
                 canvas.drawColor(AndroidColor.TRANSPARENT, PorterDuff.Mode.CLEAR)
                 val telemetry = telemetryProvider?.invoke()
                 if (telemetry != null) {
-                    drawLiveHud(canvas, telemetry, speedUnitLabelProvider?.invoke() ?: "km/h")
+                    drawLiveHud(canvas, telemetry, speedUnitLabelProvider?.invoke() ?: "km/h", activeCamera?.cameraInfo?.getSensorRotationDegrees(currentTargetRotation) ?: 0)
                 } else {
-                    drawLiveHud(canvas, GpsTelemetry(), speedUnitLabelProvider?.invoke() ?: "km/h")
+                    drawLiveHud(canvas, GpsTelemetry(), speedUnitLabelProvider?.invoke() ?: "km/h", activeCamera?.cameraInfo?.getSensorRotationDegrees(currentTargetRotation) ?: 0)
                 }
                 true
             }
@@ -200,10 +200,23 @@ class CameraRecordingManager(private val context: Context) {
      * CameraX's VIDEO_CAPTURE overlay canvas. These pixels are therefore encoded in every
      * recorded frame and survive sharing/exporting the original MP4.
      */
-    private fun drawLiveHud(canvas: Canvas, telemetry: GpsTelemetry, unit: String) {
-        val w = canvas.width.toFloat()
-        val h = canvas.height.toFloat()
-        if (w <= 0f || h <= 0f) return
+    private fun drawLiveHud(canvas: Canvas, telemetry: GpsTelemetry, unit: String, rotationDegrees: Int) {
+        val rawWidth = canvas.width.toFloat()
+        val rawHeight = canvas.height.toFloat()
+        if (rawWidth <= 0f || rawHeight <= 0f) return
+
+        // Counter-rotate the HUD against CameraX sensor rotation so it stays upright
+        // after the MP4 rotation metadata is applied by video players.
+        val normalizedRotation = ((rotationDegrees % 360) + 360) % 360
+        val canvasSave = canvas.save()
+        when (normalizedRotation) {
+            90 -> canvas.rotate(-90f, rawWidth / 2f, rawHeight / 2f)
+            180 -> canvas.rotate(-180f, rawWidth / 2f, rawHeight / 2f)
+            270 -> canvas.rotate(-270f, rawWidth / 2f, rawHeight / 2f)
+        }
+        val quarterTurn = normalizedRotation == 90 || normalizedRotation == 270
+        val w = if (quarterTurn) rawHeight else rawWidth
+        val h = if (quarterTurn) rawWidth else rawHeight
 
         val scale = (w / 1080f).coerceIn(0.55f, 2.6f)
         val cyan = AndroidColor.rgb(69, 244, 255)
@@ -333,6 +346,7 @@ class CameraRecordingManager(private val context: Context) {
                     Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.argb(90, 69, 244, 255); strokeWidth = scale })
             }
         }
+        canvas.restoreToCount(canvasSave)
     }
 
     /**
