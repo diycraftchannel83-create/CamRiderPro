@@ -141,7 +141,7 @@ fun TelemetryOverlayHeader(
                     Box(
                         modifier = Modifier
                             .size(8.dp)
-                            .background(if (settings.autoRecordOnMove) NeonGreen else HudMuted, CircleShape)
+                            .background(NeonGreen, CircleShape)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
