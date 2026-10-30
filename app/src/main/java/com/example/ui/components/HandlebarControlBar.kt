@@ -2,6 +2,8 @@ package com.example.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -156,6 +158,10 @@ private fun RecordActionButton(
     Box(
         modifier = Modifier
             .size(50.dp)
+            .drawBehind {
+                drawCircle(bgColor.copy(alpha = 0.16f), radius = size.minDimension * 0.68f)
+                drawCircle(bgColor.copy(alpha = 0.22f), radius = size.minDimension * 0.53f, style = Stroke(width = 2.dp.toPx()))
+            }
             .background(CockpitBlack.copy(alpha = 0.32f), CircleShape)
             .border(2.dp, if (isRecording) NeonRed else NeonGreen, CircleShape)
             .clickable { onClick() }
@@ -183,6 +189,10 @@ private fun HandlebarIconButton(
         onClick = onClick,
         modifier = Modifier
             .size(44.dp)
+            .drawBehind {
+                drawCircle(tint.copy(alpha = 0.15f), radius = size.minDimension * 0.68f)
+                drawCircle(tint.copy(alpha = 0.24f), radius = size.minDimension * 0.53f, style = Stroke(width = 1.8.dp.toPx()))
+            }
             .background(CockpitBlack.copy(alpha = 0.28f), CircleShape)
             .border(1.dp, NeonCyan.copy(alpha = 0.48f), CircleShape)
             .testTag(testTag)
