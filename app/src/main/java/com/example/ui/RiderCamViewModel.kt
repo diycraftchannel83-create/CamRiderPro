@@ -61,16 +61,6 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
             _rides.value = entities.map { it.toRideSession() }
         }.launchIn(viewModelScope)
 
-        // Setup auto-record callback
-        gpsTracker.isAutoRecordEnabled = _settings.value.autoRecordOnMove
-        gpsTracker.autoRecordThresholdKmh = _settings.value.autoRecordThresholdKmh
-        gpsTracker.onAutoRecordTrigger = { shouldRecord ->
-            if (shouldRecord && !cameraManager.isRecording.value) {
-                cameraManager.startRecording(_settings.value.audioEnabled)
-                _bannerMessage.value = "Motor melaju! Perekaman otomatis dimulai"
-            }
-        }
-
         // CameraX OverlayEffect reads this snapshot while encoding each frame, so the
         // recorded MP4 contains the live speed/GPS HUD without a post-recording export.
         cameraManager.telemetryProvider = { telemetry.value }
@@ -95,8 +85,10 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
             cameraManager.stopRecording()
             _bannerMessage.value = "Perekaman selesai & tersimpan otomatis"
         } else {
+            // Every manual recording starts with a clean trip accumulator.
+            gpsTracker.resetTrip()
             cameraManager.startRecording(_settings.value.audioEnabled)
-            _bannerMessage.value = "Perekaman dimulai"
+            _bannerMessage.value = "Perekaman manual dimulai"
         }
     }
 
@@ -130,8 +122,6 @@ class RiderCamViewModel(application: Application) : AndroidViewModel(application
 
     fun updateSettings(newSettings: RecordingSettings) {
         _settings.value = newSettings
-        gpsTracker.isAutoRecordEnabled = newSettings.autoRecordOnMove
-        gpsTracker.autoRecordThresholdKmh = newSettings.autoRecordThresholdKmh
     }
 
     fun updateOverlayConfig(newConfig: OverlayConfig) {
