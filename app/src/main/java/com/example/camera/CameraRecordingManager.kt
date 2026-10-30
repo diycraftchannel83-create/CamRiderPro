@@ -3,6 +3,7 @@ package com.example.camera
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
@@ -10,7 +11,8 @@ import android.graphics.Color as AndroidColor
 import android.graphics.Typeface
 import android.graphics.PorterDuff
 import android.os.Handler
-import android.os.Looper
+import android.os.HandlerThread
+import android.os.SystemClock
 import android.view.Surface
 import android.util.Log
 import android.content.ContentValues
@@ -54,6 +56,19 @@ class CameraRecordingManager(private val context: Context) {
     private var previewUseCase: Preview? = null
     private var currentTargetRotation: Int = Surface.ROTATION_0
     private var liveHudEffect: OverlayEffect? = null
+
+    // CameraX OverlayEffect composes with OpenGL. Keep GL off the UI thread and
+    // rasterize the expensive HUD only 8 times/second instead of on every frame.
+    private val hudGlThread = HandlerThread("CamRider-OpenGL").apply { start() }
+    private val hudGlHandler = Handler(hudGlThread.looper)
+    private val hudRenderThread = HandlerThread("CamRider-HUD-Raster").apply { start() }
+    private val hudRenderHandler = Handler(hudRenderThread.looper)
+    private val hudBitmapLock = Any()
+    private var cachedHudBitmap: Bitmap? = null
+    private var cachedHudWidth = 0
+    private var cachedHudHeight = 0
+    private var cachedHudLastRenderMs = 0L
+    private var hudRenderPending = false
 
     /** Supplies the latest GPS values to the encoder-side HUD for every video frame. */
     var telemetryProvider: (() -> GpsTelemetry)? = null
@@ -153,24 +168,61 @@ class CameraRecordingManager(private val context: Context) {
             liveHudEffect?.close()
             val hudEffect = OverlayEffect(
                 CameraEffect.VIDEO_CAPTURE,
-                0,
-                Handler(Looper.getMainLooper())
+                0, // Real-time HUD: render immediately without buffering camera frames.
+                hudGlHandler
             ) { throwable ->
-                Log.e("CameraRecordingManager", "Live HUD effect failed", throwable)
+                Log.e("CameraRecordingManager", "OpenGL HUD effect failed", throwable)
             }
             hudEffect.setOnDrawListener { frame ->
-                val canvas = frame.overlayCanvas
-                canvas.drawColor(AndroidColor.TRANSPARENT, PorterDuff.Mode.CLEAR)
-                val telemetry = telemetryProvider?.invoke() ?: GpsTelemetry()
-                // Use the exact transformation metadata attached to this output frame.
-                // Sensor rotation can differ from the crop/rotation CameraX applies here.
-                drawLiveHud(
-                    canvas = canvas,
-                    telemetry = telemetry,
-                    unit = speedUnitLabelProvider?.invoke() ?: "km/h",
-                    cropRect = frame.cropRect,
-                    rotationDegrees = frame.rotationDegrees
-                )
+                val outputCanvas = frame.overlayCanvas
+                outputCanvas.drawColor(AndroidColor.TRANSPARENT, PorterDuff.Mode.CLEAR)
+                val frameWidth = outputCanvas.width
+                val frameHeight = outputCanvas.height
+                val now = SystemClock.elapsedRealtime()
+
+                // Rasterize a snapshot on a worker thread. Each video frame only copies
+                // the cached bitmap into CameraX's OpenGL overlay texture.
+                synchronized(hudBitmapLock) {
+                    val sizeChanged = frameWidth != cachedHudWidth || frameHeight != cachedHudHeight
+                    val stale = now - cachedHudLastRenderMs >= 125L
+                    if ((sizeChanged || stale) && !hudRenderPending && frameWidth > 0 && frameHeight > 0) {
+                        hudRenderPending = true
+                        val crop = android.graphics.Rect(frame.cropRect)
+                        val rotation = frame.rotationDegrees
+                        hudRenderHandler.post {
+                            var rendered: Bitmap? = null
+                            try {
+                                rendered = Bitmap.createBitmap(frameWidth, frameHeight, Bitmap.Config.ARGB_8888)
+                                val rasterCanvas = Canvas(rendered)
+                                val telemetry = telemetryProvider?.invoke() ?: GpsTelemetry()
+                                drawLiveHud(
+                                    canvas = rasterCanvas,
+                                    telemetry = telemetry,
+                                    unit = speedUnitLabelProvider?.invoke() ?: "km/h",
+                                    cropRect = crop,
+                                    rotationDegrees = rotation
+                                )
+                                synchronized(hudBitmapLock) {
+                                    val previous = cachedHudBitmap
+                                    cachedHudBitmap = rendered
+                                    cachedHudWidth = frameWidth
+                                    cachedHudHeight = frameHeight
+                                    cachedHudLastRenderMs = SystemClock.elapsedRealtime()
+                                    hudRenderPending = false
+                                    rendered = null
+                                    previous?.recycle()
+                                }
+                            } catch (error: Throwable) {
+                                Log.e("CameraRecordingManager", "HUD raster update failed", error)
+                                synchronized(hudBitmapLock) { hudRenderPending = false }
+                            } finally {
+                                rendered?.recycle()
+                            }
+                        }
+                    }
+                    // Lock protects the cached bitmap from being recycled while copied.
+                    cachedHudBitmap?.let { outputCanvas.drawBitmap(it, 0f, 0f, null) }
+                }
                 true
             }
             liveHudEffect = hudEffect
@@ -553,5 +605,16 @@ class CameraRecordingManager(private val context: Context) {
         cameraProvider?.unbindAll()
         liveHudEffect?.close()
         liveHudEffect = null
+        hudRenderHandler.removeCallbacksAndMessages(null)
+        hudGlHandler.removeCallbacksAndMessages(null)
+        synchronized(hudBitmapLock) {
+            cachedHudBitmap?.recycle()
+            cachedHudBitmap = null
+            cachedHudWidth = 0
+            cachedHudHeight = 0
+            hudRenderPending = false
+        }
+        hudRenderThread.quitSafely()
+        hudGlThread.quitSafely()
     }
 }
