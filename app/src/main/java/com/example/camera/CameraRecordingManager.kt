@@ -193,16 +193,17 @@ class CameraRecordingManager(private val context: Context) {
                         val replaceBuffers = sizeChanged || cachedHudBitmap == null || spareHudBitmap == null
                         val reusableTarget = if (replaceBuffers) null else spareHudBitmap
                         hudRenderHandler.post {
-                            var rendered: Bitmap? = reusableTarget
+                            var rendered: Bitmap? = null
                             var newSpare: Bitmap? = null
                             try {
-                                if (rendered == null) {
-                                    rendered = Bitmap.createBitmap(frameWidth, frameHeight, Bitmap.Config.ARGB_8888)
+                                val targetBitmap = reusableTarget ?: Bitmap.createBitmap(
+                                    frameWidth, frameHeight, Bitmap.Config.ARGB_8888
+                                ).also { rendered = it }
+                                if (replaceBuffers) {
                                     newSpare = Bitmap.createBitmap(frameWidth, frameHeight, Bitmap.Config.ARGB_8888)
                                 } else {
-                                    rendered.eraseColor(AndroidColor.TRANSPARENT)
+                                    targetBitmap.eraseColor(AndroidColor.TRANSPARENT)
                                 }
-                                val targetBitmap = rendered ?: throw IllegalStateException("HUD bitmap allocation failed")
                                 val rasterCanvas = Canvas(targetBitmap)
                                 val telemetry = telemetryProvider?.invoke() ?: GpsTelemetry()
                                 drawLiveHud(
