@@ -158,7 +158,7 @@ fun CameraRiderScreen(
             .fillMaxSize()
             .background(CockpitBlack)
     ) {
-        // 1. Live Camera Preview Layer
+        // LAYER 1 — CameraPreviewLayer: live camera only.
         AndroidView(
             factory = { ctx ->
                 PreviewView(ctx).apply {
@@ -182,7 +182,7 @@ fun CameraRiderScreen(
             )
         }
 
-        // 2. Telemetry HUD Layer
+        // LAYER 2 — TelemetryHUDLayer: Compose preview HUD. CameraX OverlayEffect burns its matching HUD into the MP4.
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
@@ -230,19 +230,6 @@ fun CameraRiderScreen(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(top = 54.dp, end = 12.dp)
-                    )
-                }
-
-                // Bottom Center: Speedometer Cockpit Gauge
-                if (overlayConfig.showSpeedometer) {
-                    SpeedometerCockpit(
-                        telemetry = telemetry,
-                        speedUnit = settings.speedUnit,
-                        showGearRpm = overlayConfig.showGearRpm,
-                        isLandscape = true,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 34.dp)
                     )
                 }
 
@@ -296,22 +283,25 @@ fun CameraRiderScreen(
                         .padding(horizontal = 8.dp, vertical = 2.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (overlayConfig.showSpeedometer) {
-                        SpeedometerCockpit(
-                            telemetry = telemetry,
-                            speedUnit = settings.speedUnit,
-                            showGearRpm = overlayConfig.showGearRpm,
-                            isLandscape = false,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
-                    }
-
                     TelemetryVideoBannerOverlay(
                         telemetry = telemetry,
                         speedUnit = settings.speedUnit,
                         overlayConfig = overlayConfig
                     )
                 }
+            }
+
+            // Speedometer stays in the upper HUD zone in both orientations.
+            if (overlayConfig.showSpeedometer) {
+                SpeedometerCockpit(
+                    telemetry = telemetry,
+                    speedUnit = settings.speedUnit,
+                    showGearRpm = overlayConfig.showGearRpm,
+                    isLandscape = isLandscape,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = if (isLandscape) 76.dp else 142.dp)
+                )
             }
 
             // Floating Notification Toast/Banner
@@ -349,7 +339,7 @@ fun CameraRiderScreen(
             }
         }
 
-        // 3. Permission Request Card if not yet granted
+        // LAYER 3 — ControlLayer / permissions: controls remain UI-only and are not drawn into the recording.
         if (!permissionsGranted) {
             Box(
                 modifier = Modifier
