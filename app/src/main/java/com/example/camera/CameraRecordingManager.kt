@@ -58,6 +58,7 @@ class CameraRecordingManager(private val context: Context) {
     /** Supplies the latest GPS values to the encoder-side HUD for every video frame. */
     var telemetryProvider: (() -> GpsTelemetry)? = null
     var speedUnitLabelProvider: (() -> String)? = null
+    var videoProfileLabelProvider: (() -> String)? = null
     private var activeRecording: Recording? = null
 
     private var currentLensFacing = CameraSelector.LENS_FACING_BACK
@@ -268,7 +269,7 @@ class CameraRecordingManager(private val context: Context) {
             Paint(Paint.ANTI_ALIAS_FLAG).apply { color = red; setShadowLayer(8f * scale, 0f, 0f, red) })
         drawText("VIDEO REC", margin + 31f * scale, top + 29f * scale, 13f, red, true)
         drawPanel(RectF(margin, top + 52f * scale, margin + 235f * scale, top + 82f * scale), 8f, cyan)
-        drawText("1080p  60FPS  H.265", margin + 10f * scale, top + 73f * scale, 11f, white, true)
+        drawText(videoProfileLabelProvider?.invoke() ?: "1080p  60FPS  H.265", margin + 10f * scale, top + 73f * scale, 11f, white, true)
 
         val battery = context.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
         val level = battery?.getIntExtra("level", -1) ?: -1
