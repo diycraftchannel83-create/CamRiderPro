@@ -332,7 +332,7 @@ class CameraRecordingManager(private val context: Context) {
         val speed = (telemetry.speedKmh * unitMultiplier).coerceIn(0f, 200f)
         val radius = minOf(w * .275f, h * .175f).coerceAtLeast(105f * scale)
         val cx = w * .53f
-        val cy = if (h > w) h * .435f else h * .50f
+        val cy = if (h > w) h * .35f else h * .50f
         val dial = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
         canvas.drawCircle(cx, cy, radius + 13f * scale, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.argb(220, 3, 10, 17) })
         val arc = Paint(Paint.ANTI_ALIAS_FLAG).apply {
