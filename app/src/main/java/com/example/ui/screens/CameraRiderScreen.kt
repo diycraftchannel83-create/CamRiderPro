@@ -81,6 +81,7 @@ import com.example.ui.theme.HudMuted
 import com.example.ui.theme.HudWhite
 import com.example.ui.theme.NeonCyan
 import com.example.ui.theme.NeonGreen
+import com.example.ui.theme.NeonRed
 import com.example.ui.theme.NeonYellow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
