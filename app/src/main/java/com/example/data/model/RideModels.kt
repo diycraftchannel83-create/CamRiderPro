@@ -41,7 +41,12 @@ data class OverlayConfig(
     val showCoordinates: Boolean = true,
     val showGearRpm: Boolean = true,
     val showDateTime: Boolean = true,
-    val showWatermark: Boolean = true
+    /**
+     * Watermark display is controlled by the app's entitlement/credit state.
+     * Keep the legacy field for database/settings compatibility; do not use it
+     * as the authority for whether a watermark is burned into a recording.
+     */
+    val showWatermark: Boolean = false
 )
 
 data class RecordingSettings(
