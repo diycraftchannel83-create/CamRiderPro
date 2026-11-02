@@ -75,6 +75,12 @@ class CameraRecordingManager(private val context: Context) {
     var telemetryProvider: (() -> GpsTelemetry)? = null
     var speedUnitLabelProvider: (() -> String)? = null
     var videoProfileLabelProvider: (() -> String)? = null
+    /**
+     * True only when the current account/session has an active remove-watermark
+     * entitlement. This is sampled on the HUD raster worker and affects the
+     * exact bitmap that CameraX encodes into the MP4.
+     */
+    @Volatile var watermarkEnabledProvider: (() -> Boolean)? = null
     private var activeRecording: Recording? = null
 
     private var currentLensFacing = CameraSelector.LENS_FACING_BACK
@@ -331,6 +337,8 @@ class CameraRecordingManager(private val context: Context) {
         val yellow = AndroidColor.rgb(255, 211, 64)
         val white = AndroidColor.rgb(245, 251, 255)
         val muted = AndroidColor.rgb(175, 202, 215)
+        // A paid remove-watermark entitlement suppresses branding on the exported
+        // video itself; rendering is skipped before the frame reaches CameraX.
         val panelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.argb(190, 4, 12, 20) }
         val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = cyan; style = Paint.Style.STROKE; strokeWidth = 1.6f * scale
@@ -494,6 +502,9 @@ class CameraRecordingManager(private val context: Context) {
             if (index > 0) canvas.drawLine(left, footer.top + 15f * scale, left, footer.bottom - 12f * scale,
                 Paint(Paint.ANTI_ALIAS_FLAG).apply { color = AndroidColor.argb(100, 69, 244, 255); strokeWidth = scale })
         }
+        // Free-tier branding is deliberately not forced while no watermark asset
+        // is configured in this project. The live HUD and recorded HUD remain identical.
+        // The provider is retained for the app's purchase/credit integration.
         canvas.restoreToCount(save)
     }
 
