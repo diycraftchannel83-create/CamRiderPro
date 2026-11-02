@@ -378,9 +378,6 @@ fun SettingsDialog(
                     OverlayToggleItem("Tanggal & Waktu Real-Time", overlayConfig.showDateTime) {
                         onOverlayConfigChange(overlayConfig.copy(showDateTime = it))
                     }
-                    OverlayToggleItem("Watermark Logo RiderCam", overlayConfig.showWatermark) {
-                        onOverlayConfigChange(overlayConfig.copy(showWatermark = it))
-                    }
                 }
             }
         }
